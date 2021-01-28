@@ -9,6 +9,12 @@
 	<title>Swiper</title>
 	<script src="jquery-1.12.4.min.js"></script>
 	<style>
+		/* 
+			1.걸치는 기능
+			2.freeMode (짝수 안맞을 때, page 기능 사용 못함)
+			3.자동롤링 기능
+			4.bundle_box 기능
+		 */
 		* { box-sizing: border-box; }
 		html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
 		form { margin: 0; padding: 0; }
@@ -33,23 +39,24 @@
 
 		.wrap {swidth:1280px;margin:0 auto;padding:20px;overflow:hidden;}
 		.wrap > strong {text-align:center;display:block;}
-		.swiper {position:relative;overflow:hidden;}
-		.swiper ~ strong {margin-top:20px;}
-		.swiper .item {width:100%;height:200px;display:flex;}
-		.swiper .item > li {width:100%;border:1px solid red;background-color:#ccc;flex:1 0 auto;display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
-		.swiper .btn_prev {position:absolute;left:0;top:50%;width:100px;height:100px;margin-top:-50px;}
-		.swiper .btn_next {position:absolute;right:0;top:50%;width:100px;height:100px;margin-top:-50px;}
-		.swiper .indicator {position:absolute;left:0;bottom:20px;width:100%;height:0;font-size:0;text-align:center;}
-		.swiper .indicator > ul {height:0;}
-		.swiper .indicator li {width:10px;height:10px;margin:0 5px;font-size:0;border-radius:50%;background-color:darkblue;vertical-align:top;display:inline-block;}
-		.swiper .indicator li.on {background-color:darkred;}
-		.swiper .indicator li a {height:100%;display:block;}
-		.swiper .page {position:absolute;left:0;top:10px;width:100%;height:0;font-weight:700;text-align:center;}
-		.swiper .page em {font-style:normal;}
+		.swiper_area {position:relative;overflow:hidden;}
+		.swiper_area ~ strong {margin-top:20px;}
+		.swiper_area .swiper_box {width:100%;height:200px;display:flex;flex-wrap:nowrap;}
+		.swiper_area .swiper_box > li {width:100%;border:1px solid red;background-color:#ccc;flex:1 0 auto;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:0 0 auto;}
+		.swiper_area .btn_prev {position:absolute;left:0;top:50%;width:100px;height:100px;margin-top:-50px;}
+		.swiper_area .btn_next {position:absolute;right:0;top:50%;width:100px;height:100px;margin-top:-50px;}
+		.swiper_area .indicator {position:absolute;left:0;bottom:20px;width:100%;height:0;font-size:0;text-align:center;}
+		.swiper_area .indicator > ul {height:0;}
+		.swiper_area .indicator li {width:10px;height:10px;margin:0 5px;font-size:0;border-radius:50%;background-color:darkblue;vertical-align:top;display:inline-block;}
+		.swiper_area .indicator li.on {background-color:darkred;}
+		.swiper_area .indicator li a {height:100%;display:block;}
+		.swiper_area .page {position:absolute;left:0;top:10px;width:100%;height:0;font-weight:700;text-align:center;}
+		.swiper_area .page em {font-style:normal;}
 
-		.swiper.t1 .item > li {width:50%;}
-		.swiper.t2 .item > li {width:32%;margin-right:2%;}
-		.swiper.t3 .item > li {width:25%;}
+		.swiper_area.t1 .swiper_box > li {width:50%;}
+		.swiper_area.t2 .swiper_box > li {width:32%;margin-right:2%;}
+		.swiper_area.t3 .swiper_box > li {width:25%;}
+		.swiper_area.t4 .swiper_box > li {width:20%;}
 	</style>
 	<script>
 		/* #########################################################
@@ -93,7 +100,8 @@
 				return target_transX;
 			}
 
-			this.target_name = args.target_name;
+			this.target_name = args.target_name;						// swiper container
+			this.swiper_box = $(".swiper_box", this.target_name);		// swiper box
 			this.loop = args.loop || false;								// 무한, 유한 설정
 			this.page = args.page || false;								// 페이징 설정
 			this.bundle = args.bundle || 1;								// 움직일 슬라이드 그룹 수
@@ -106,37 +114,39 @@
 
 			this._autoSwipe = args.auto_time > 0 ? true : false;
 
-			this.max;													// li 총 개수
-			this.pageMax;												// page 최대수
 			this.preview;												// 보이는 개수
-			this.itemBundleWidth;										// 묶음 너비
-			this.widthMaxMoment;											// 대상의 최대 직전의 값.(순간적으로 위치를 변경을 하기 위한 기준점)
+			this.etcItem = 0;											// bundle 외에 짝이 안맞는 item 수.
+			this.addItem = 0;											// loop의 경우 preview + bundle 의 값.
+			this.max;													// li 총 개수
+			this.maxPage;												// page 최대수
+			this.maxMove = 0;											// 최대 이동 가능 거리
 
-			this.cachedWidth = $(window).width();						// 기기 너비
+			this.widthBundle;											// 묶음 너비
+			this.widthMaxMoment;										// 대상의 최대 직전의 값.(순간적으로 위치를 변경을 하기 위한 기준점)
+			this.widthFullArea_X2 = 0;									// 내 영역의 2배 크기 :: $(target_name).parent().width() * 2; <- 100% 일 경우 기본값
+			this.widthItem = 0;											// 대상의 이동 너비 값 (아이템 1개의 너비).
+			this.widthFullArea = 0;										// 대상을 감싸는 너비 값.
+			this.widthCached = $(window).width();						// 기기 너비
+
 			this.startX = 0;											// 시작점X.
 			this.startY = 0;											// 시작점Y.
 			this.moveX = 0;												// 좌우로 움직인 거리.
 			this.moveY = 0;												// 상하로 움직인 거리.
+			this.moveSpeed;												// 스와이프 스피드.
 			this.resultX = 0;											// 최종 움직인 거리.
 			this.lastXY;												// 첫 클릭 또는 이동한 이벤트에서 xy 좌표값을 구해야 모바일에서 미세한 차이가 안생김.
-			this.moveSpeed;												// 스와이프 스피드.
 			this.speedSetTime = false;									// setTimeout 사용 여부 체크, moveSpeed 5 이상일때 동작해라.
+			this.standardX = 0;											// 기준이 되는 X 위치 값.
 
-			this.transX = 0;											// 대상의 처음 위치 값.
-			this.goThisx = 0;											// 대상이 실제 움직일 거리.
-			this.thisx = 0;												// 대상의 현재 위치 값.
+			this.mouseStartX = 0;										// 대상의 처음 위치 값. (mouseStart)
+			this.mouseMoveX = 0;										// 대상이 드래그 한 거리. (mouseMove)
+			this.mouseEndX = 0;											// 대상의 드래그 최종 위치 값. (mouseEnd)
 			this.moveLv = 0;											// 몇 단계로 이동 해야 하는가?
+			this.percent = 0;											// 드래그 움직임의 %
 
 			this.swipeAction = false;									// 대상이 스와이프 중인가? 기본값 '아니오'
 			this.swipeRight = true;										// 스와이프 방향은? 기본값 '우측'
 			this.scrolling = false;										// 스크롤 중인가? 기본값 '아니오'
-
-			this.percent = 0;											// 드래그 움직임의 %
-			this.parentWidth_X2 = 0;									// 내 영역의 2배 크기 :: $(target_name).parent().width() * 2; <- 100% 일 경우 기본값
-			this.targetMaxMove = 0;										// 최대 이동 거리
-
-			this.itemMoveWidth = 0;										// 대상의 이동 너비 값 (아이템 1개의 너비).
-			this.parentWidth = 0;										// 대상을 감싸는 너비 값.
 			this.transxReset = true;									// 대상의 현재 위치 값. 재설정 하겠니? 기본값 '예'
 			this.tmpResizePer = 0;										// 몇 % 움직인 상태인가? 기본값 '0'
 
@@ -162,7 +172,7 @@
 				this.fnSettings();
 
 				if( this.control_group ){
-					$(this.target_name).after("<div class='control'></div>");
+					$(this.swiper_box).after("<div class='control'></div>");
 				}
 
 				if( this.indicator ){
@@ -203,90 +213,92 @@
 			},
 
 			fnWidthSet : function() {
-				this.parentWidth = $(this.target_name).parent()[0].getBoundingClientRect().width + parseFloat($(this.target_name).find("> li").css("marginRight"));
-				this.itemMoveWidth = $(this.target_name).find("> li")[0].getBoundingClientRect().width + parseFloat($(this.target_name).find("> li").css("marginRight"));
-				this.preview = Math.round(this.parentWidth / this.itemMoveWidth);
-				//console.log(this.parentWidth, this.itemMoveWidth, this.preview);
+				this.widthFullArea = $(this.target_name)[0].getBoundingClientRect().width + parseFloat($(this.swiper_box).find("> li").css("marginRight"));
+				this.widthItem = $(this.swiper_box).find("> li")[0].getBoundingClientRect().width + parseFloat($(this.swiper_box).find("> li").css("marginRight"));
+				this.preview = Math.round(this.widthFullArea / this.widthItem);
+				console.log(this.widthFullArea, this.widthItem, this.preview);
 			},
 
 			fnSettings : function() {
-				this.max = $(">li", this.target_name).length;
-				this.itemBundleWidth = this.itemMoveWidth * this.bundle;
+				this.max = $(">li", this.swiper_box).length;
+				this.widthBundle = this.widthItem * this.bundle;
+				this.standardX = this.widthItem * this.addItem;
+				this.etcItem = (this.max - (this.addItem * 2)) % this.bundle;
 				if( this.loop ){
-					this.pageMax = Math.ceil((this.max - (this.preview * 2)) / this.bundle);
+					this.maxPage = Math.ceil((this.max - (this.addItem * 2)) / this.bundle);
 
-					this.moveLv = this.moveLv == 0 ? 1 : this.moveLv;
-					$(this.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.itemMoveWidth * (this.preview - this.bundle) - (this.itemBundleWidth * this.moveLv)) + "px, 0px, 0px)"});
+					$(this.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.standardX - (this.widthItem * this.moveLv * this.bundle)) + "px, 0px, 0px)"});
+
+					// 최대 이동값 계산.
+					this.maxMove = this.addItem * 2 * -this.widthItem;
 				}else{
 					if(this.bundle == 1){
-						this.pageMax = this.max / this.bundle - (this.preview - this.bundle);
+						this.maxPage = this.max / this.bundle - (this.preview - this.bundle);
 					}else{
-						this.pageMax = Math.round(this.max / this.bundle);
+						this.maxPage = Math.round(this.max / this.bundle);
 					}
 
-					this.parentWidth_X2 = $(this.target_name).parent().width() * 2;
-					$(this.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.itemMoveWidth * this.moveLv * this.bundle) + "px, 0px, 0px)"});
+					this.widthFullArea_X2 = $(this.target_name).width() * 2;
+					$(this.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.widthItem * this.moveLv * this.bundle) + "px, 0px, 0px)"});
+
+					// 최대 이동값 계산.
+					this.maxMove = (this.max - this.preview) * -this.widthItem;
 				}
 
-				// 최대 이동값 계산.
-				this.targetMaxMove = (this.max - this.preview) * -this.itemMoveWidth;
-
-				var _moment = (this.max - (this.preview * 2)) % this.bundle;
-				this.widthMaxMoment = _moment == 0 ? this.targetMaxMove + this.itemBundleWidth : this.targetMaxMove + this.itemMoveWidth * _moment;
-				console.log(this.target_name, "/ max =", this.max, "/ itemBundleWidth=", this.itemBundleWidth, " / widthMaxMoment", this.widthMaxMoment);
-				$(this.target_name).find("> li:eq(" + (this.preview * this.moveLv) + ")").addClass("on");
+				if( this.etcItem == 0 ){
+					this.widthMaxMoment = this.maxMove + this.widthBundle;
+				}else{
+					this.widthMaxMoment = this.maxMove + this.widthItem * this.etcItem;
+				}
+				
+				console.log("data-swiper=" + $(this.target_name).attr("data-swiper") + " ::", "max =", this.max, "/ widthBundle=", this.widthBundle, " / widthMaxMoment", this.widthMaxMoment);
+ 				$(this.swiper_box).find("> li:eq(" + (this.addItem + this.moveLv * this.bundle) + ")").addClass("on");
 			},
 
 			// 무한인 경우 li에 index 넘버 설정하기
 			fnIndex : function() {
-				$("> li", this.target_name).each(function(idx){
+				$("> li", this.swiper_box).each(function(idx){
 					$(this).attr("data-index", idx);
 				});
 			},
 
 			// 대상의 처음과 끝 객체 복사
 			fnClone : function() {
-				var temp_first = [];
-				var temp_last = [];
-				var _max = $("> li", this.target_name).length - 1;
-				var count = (this.preview == this.bundle) ? this.bundle : this.preview;
-				console.log("fnClone", this.target_name, this.preview, this.bundle);
-				for(var i = 0; i < count; i++){
-					temp_first[i] = $("> li:eq(" + i + ")", this.target_name).clone();
-					temp_last[i] = $("> li:eq(" + (_max - i) + ")", this.target_name).clone();
+				var temp_item = [];
+				this.addItem = $("> li", this.swiper_box).length;
+				for(var i = 0; i < this.addItem; i++){
+					$("> li:eq(" + i + ")", this.swiper_box).attr("data-index", i);
+					temp_item[i] = $("> li:eq(" + i + ")", this.swiper_box).clone();
+					$(this.swiper_box).append( temp_item[i] );
 				}
-				for(var i = 0; i < count; i++){
-					$(this.target_name).append( temp_first[i] );
-					$(this.target_name).prepend( temp_last[i] );
-				}
+				temp_item.reverse();
+				for(var i = 0; i < this.addItem; i++){
+					$(this.swiper_box).prepend( temp_item[i].clone() );
+				};
 
-				if( $.type(this.together_box) === "object" ){
-					temp_first = $("> div:first", this.together_box).clone();
-					temp_last = $("> div:last", this.together_box).clone();
+				// if( $.type(this.together_box) === "object" ){
+				// 	temp_first = $("> div:first", this.together_box).clone();
+				// 	temp_last = $("> div:last", this.together_box).clone();
 
-					$(this.together_box).append( temp_first );
-					$(this.together_box).prepend( temp_last );
-				}
+				// 	$(this.together_box).append( temp_first );
+				// 	$(this.together_box).prepend( temp_last );
+				// }
 			},
 
 			// 페이지 표시 생성
 			fnMakePage : function() {
-				var _str = "<div class='page'><em>1</em>/<span>" + this.pageMax + "</span></div>";
+				var _str = "<div class='page'><em>1</em>/<span>" + this.maxPage + "</span></div>";
 
 				if( this.control_group ){
-					$(this.target_name).parent().find(".control").append( _str );
+					$(this.target_name).find(".control").append( _str );
 				}else{
-					$(this.target_name).after( _str );
+					$(this.swiper_box).after( _str );
 				}
 			},
 
 			fnPageCount : function() {
 				// 페이지 넘버 표시
-				if( this.loop ){
-					$(this.target_name).parent().find(".page em").text( this.moveLv );
-				}else{
-					$(this.target_name).parent().find(".page em").text( this.moveLv + 1 );
-				}
+				$(this.target_name).find(".page em").text( this.moveLv + 1 );
 			},
 
 			// 인디케이터 표시 생성
@@ -294,54 +306,49 @@
 				var obj = this;
 				var _str = "<div class='indicator'><ul></ul></div>";
 				if( this.control_group ){
-					$(this.target_name).parent().find(".control").append( _str );
+					$(this.target_name).find(".control").append( _str );
 				}else{
-					$(this.target_name).after( _str );
+					$(this.swiper_box).after( _str );
 				}
 
-				var _target = $(this.target_name).parent().find(".indicator ul");
+				var target_indi = $(this.target_name).find(".indicator ul");
 
-				for(var idx = 0; idx < this.pageMax; idx++){
-					$(_target).append("<li><a href='#none'>" + (idx + 1) + "</a></li>");
+				for(var idx = 0; idx < this.maxPage; idx++){
+					$(target_indi).append("<li><a href='#none'>" + (idx + 1) + "</a></li>");
 				};
 				fnEventIndicator();
 
 				// 인디케이터 이벤트 생성
 				function fnEventIndicator() {
-					$("> li:first", _target).addClass("on");
+					$("> li:first", target_indi).addClass("on");
 
-					$(_target).on("click", "a", function(e) {
+					$(target_indi).on("click", "a", function(e) {
 						//clearTimeout(obj.autoSetTime); //자동 롤링 제거
 
-						var tmp_conNum = $("a", _target).index( $(this) );
-						if( obj.loop ){
-							obj.moveLv = tmp_conNum + 1;
+						var tmp_conNum = $("a", target_indi).index( $(this) );
+						obj.moveLv = tmp_conNum;
+						//console.log(obj.moveLv, obj.addItem, obj.moveLv);
+						// 슬라이드에 on 클래스 정의
+						$(obj.swiper_box).find("> li").removeClass("on").eq(obj.addItem + obj.moveLv * obj.bundle).addClass("on");
 
-						}else{
-							obj.moveLv = tmp_conNum;
-						}
-						console.log(obj.moveLv);
-						//슬라이드 이벤트
-						$(obj.target_name).find("> li").removeClass("on").eq(obj.preview + (obj.moveLv - 1) * obj.bundle).addClass("on");
-
-						$("> li", _target).removeClass("on").eq( tmp_conNum ).addClass("on");
+						$("> li", target_indi).removeClass("on").eq( tmp_conNum ).addClass("on");
 						if( obj.loop ) {
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.itemMoveWidth * (obj.preview - obj.bundle) - (obj.itemBundleWidth * obj.moveLv)) + "px, 0px, 0px)"});
+							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv)) + "px, 0px, 0px)"});
 
 							if( $.type(obj.together_box) === "object" ){
-								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.itemMoveWidth * (obj.preview - obj.bundle) - (obj.itemBundleWidth * obj.moveLv)) + "px, 0px, 0px)"});
+								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (-obj.widthItem * obj.moveLv)) + "px, 0px, 0px)"});
 							}
 						}else{
-							var target_max = -obj.itemBundleWidth * obj.moveLv + parseFloat($(obj.target_name).find("> li").css("marginRight"));
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.targetMaxMove ? obj.targetMaxMove : target_max) + "px, 0px, 0px)"});
+							var target_max = -obj.widthBundle * obj.moveLv + parseFloat($(obj.swiper_box).find("> li").css("marginRight"));
+							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
 
 							if( $.type(obj.together_box) === "object" ){
-								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.targetMaxMove ? obj.targetMaxMove : target_max) + "px, 0px, 0px)"});
+								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
 							}
 						}
 
 						if( $.type(obj.together_box) === "object" ){
-							$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.itemBundleWidth * obj.moveLv) + "px, 0px, 0px)"});
+							$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.widthBundle * obj.moveLv) + "px, 0px, 0px)"});
 							$("> .evt_con", obj.together_box).css({"height" : ""}).height( $("> .evt_con", obj.together_box).eq( obj.moveLv ).height() );
 						}
 
@@ -357,23 +364,23 @@
 
 			// 인디케이터 on 제어
 			fnIndicatorOn : function() {
-				if( this.loop ){
-					$(this.target_name).parent().find(".indicator ul > li").removeClass("on").eq(this.moveLv - 1).addClass("on");
-				}else{
-					$(this.target_name).parent().find(".indicator ul > li").removeClass("on").eq(this.moveLv).addClass("on");
-				}
+				$(this.target_name).find(".indicator ul > li").removeClass("on").eq(this.moveLv).addClass("on");
 			},
 
 			// 네비(좌,우) 버튼 제어
 			fnNavi : function() {
 				var obj = this;
 
-				$(this.navi.prev).on(this.evtTypeStart, this, function(){
+				$(this.navi.prev).on(this.evtTypeStart, this, function(e){
 					obj.moveLv--;
 					if( obj.loop ){
-						if( obj.moveLv < 1 ){
-							obj.moveLv = obj.pageMax;
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.targetMaxMove + "px, 0px, 0px)"});
+						if( obj.moveLv < 0 ){
+							obj.moveLv = obj.maxPage - 1;
+							if( obj.etcItem == 0 ){
+								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - obj.widthBundle) + "px, 0px, 0px)"});
+							}else{
+								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem)) + "px, 0px, 0px)"});
+							}
 						}
 					}else{
 						if( obj.moveLv < 0 ){
@@ -391,17 +398,23 @@
 						obj.fnPageCount();
 					}
 					obj.fnMoveGo();
+
+					e.stopPropagation();
 				});
-				$(this.navi.next).on(this.evtTypeStart, this, function(){
+				$(this.navi.next).on(this.evtTypeStart, this, function(e){
 					obj.moveLv++;
 					if( obj.loop ){
-						if( obj.moveLv > obj.pageMax ){
-							obj.moveLv = 1;
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.itemMoveWidth * (obj.preview - obj.bundle)) + "px, 0px, 0px)"});
+						if( obj.moveLv > obj.maxPage - 1 ){
+							obj.moveLv = 0;
+							if( obj.etcItem == 0 ){
+								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthBundle) + "px, 0px, 0px)"});
+							}else{
+								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem)) + "px, 0px, 0px)"});
+							}
 						}
 					}else{
-						if( obj.moveLv > obj.pageMax - 1 ){
-							obj.moveLv = obj.pageMax - 1;
+						if( obj.moveLv > obj.maxPage - 1 ){
+							obj.moveLv = obj.maxPage - 1;
 						}
 					}
 					// 인디케이터 on 표시
@@ -414,6 +427,8 @@
 						obj.fnPageCount();
 					}
 					obj.fnMoveGo();
+
+					e.stopPropagation();
 				});
 			},
 
@@ -445,11 +460,13 @@
 
 					obj.lastXY = e;
 
-					/* 스와이프중인가? 1회만 체크하는 if문.
-						최초 움직일때 현재 위치값 저장. */
+					/* 
+						스와이프중인가? 1회만 체크하는 if문.
+						최초 움직일때 현재 위치값 저장. 
+					*/
 					if( !obj.swipeAction ){
 						//target_transX = $(target_name).css("transform").split(",");
-						obj.transX = obj.fnTransform3D( obj.target_name );
+						obj.mouseStartX = obj.fnTransform3D( obj.swiper_box );
 						obj.swipeAction = true;
 
 						if( Math.abs(obj.moveX - obj.startX) < Math.abs(obj.moveY - obj.startY) ){
@@ -460,9 +477,9 @@
 						obj.resultX = obj.moveX - obj.startX;
 
 						// animation 클래스가 있다면 중첩 이동을 뜻함.
-						if( $(obj.target_name).hasClass("animation") ){
-							obj.transX = obj.fnTransform3D( obj.target_name );
-							$(obj.target_name).removeClass("animation").off("transitionend webkitTransitionEnd");
+						if( $(obj.swiper_box).hasClass("animation") ){
+							obj.mouseStartX = obj.fnTransform3D( obj.swiper_box );
+							$(obj.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
 							$(obj.together_box).off("transitionend webkitTransitionEnd");
 						}
 					}
@@ -481,38 +498,38 @@
 						}
 
 						// 최종 가게 될 위치
-						obj.goThisx = parseInt(obj.transX) + obj.moveX - obj.startX;
+						obj.mouseMoveX = parseInt(obj.mouseStartX) + obj.moveX - obj.startX;
 
 						if( obj.loop ){
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.goThisx + "px, 0px, 0px)"});
+							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
 
 							if( $.type(obj.together_box) === "object" ){
-								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.goThisx + "px, 0px, 0px)"});
+								$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
 							}
 						}else{
 							// 현재변하는 위치에서 최초위치에서 움직인값을 빼어 최종 움직인 간격으로 스피드 가늠.
-							// moveSpeed = Math.abs(Math.abs(thisx) - Math.abs(parseInt(target_transX) + moveX - startX));
-							obj.moveSpeed = Math.ceil(Math.abs(parseInt(obj.thisx) - obj.goThisx));
+							// moveSpeed = Math.abs(Math.abs(mouseEndX) - Math.abs(parseInt(target_transX) + moveX - startX));
+							obj.moveSpeed = Math.ceil(Math.abs(parseInt(obj.mouseEndX) - obj.mouseMoveX));
 
 							// 최종 가게 될 위치를 너비의 2배로 % 하여 절반까지만 움직이게 한다.
 							// %가 절반을 넘으면 다시 되돌아가기 때문에 0.5 까지만 계산한다.
-							if(obj.goThisx > 0){
-								obj.percent = (obj.parentWidth_X2 - obj.goThisx) / obj.parentWidth_X2;
+							if(obj.mouseMoveX > 0){
+								obj.percent = (obj.widthFullArea_X2 - obj.mouseMoveX) / obj.widthFullArea_X2;
 								if(obj.percent <= 0.50){
-									obj.goThisx = obj.itemBundleWidth * 0.25;
+									obj.mouseMoveX = obj.widthBundle * 0.25;
 								}else{
-									obj.goThisx = obj.goThisx * (obj.percent / 2); // percent 를 크게 나눌 수록 범위 축소.
+									obj.mouseMoveX = obj.mouseMoveX * (obj.percent / 2); // percent 를 크게 나눌 수록 범위 축소.
 								}
-							}else if(obj.goThisx < obj.targetMaxMove){
-								obj.percent = (obj.parentWidth_X2 + (obj.goThisx - obj.targetMaxMove)) / obj.parentWidth_X2;
+							}else if(obj.mouseMoveX < obj.maxMove){
+								obj.percent = (obj.widthFullArea_X2 + (obj.mouseMoveX - obj.maxMove)) / obj.widthFullArea_X2;
 								if(obj.percent <= 0.50){
-									obj.goThisx = obj.targetMaxMove - (obj.itemBundleWidth * 0.25);
+									obj.mouseMoveX = obj.maxMove - (obj.widthBundle * 0.25);
 								}else{
-									obj.goThisx = obj.targetMaxMove + ((obj.goThisx - obj.targetMaxMove) * (obj.percent / 2));
+									obj.mouseMoveX = obj.maxMove + ((obj.mouseMoveX - obj.maxMove) * (obj.percent / 2));
 								}
 							}
 
-							$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.goThisx + "px, 0px, 0px)"});
+							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
 						}
 
 						return false;
@@ -536,54 +553,54 @@
 						obj.swipeAction = false;
 					}else if(obj.startX != obj.moveX){
 						// 최종 움직인 위치값 저장
-						obj.thisx = obj.fnTransform3D( obj.target_name );
+						obj.mouseEndX = obj.fnTransform3D( obj.swiper_box );
 
 						if( obj.loop ){
 							// 최소, 최대 위치를 넘으면 순간적으로 이동시킴.
-							if( obj.resultX < -obj.itemBundleWidth * 0.3 && obj.swipeRight || obj.resultX > obj.itemBundleWidth * 0.3 && !obj.swipeRight ){
+							if( obj.resultX < -obj.widthBundle * 0.3 && obj.swipeRight || obj.resultX > obj.widthBundle * 0.3 && !obj.swipeRight ){
 								if( obj.transxReset ){
-									if( Number(obj.thisx) >= -obj.parentWidth ){
-										var tmp_val = obj.targetMaxMove + obj.parentWidth + Number(obj.thisx);
-										//console.log(tmp_val, Number(obj.thisx));
-										$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + "px, 0px, 0px)"});
-									}else if( Number(obj.thisx) <= obj.widthMaxMoment){
-										var tmp_val = obj.parentWidth + (obj.targetMaxMove - Number(obj.thisx));
-										console.log("a", tmp_val, obj.parentWidth, Number(obj.thisx), obj.targetMaxMove, $(obj.target_name).css("transform"));
-										$(obj.target_name).css({"transition-duration" : "0ms", "transform" : "translate3d(" + -tmp_val + "px, 0px, 0px)"});
+									if( Number(obj.mouseEndX) >= -obj.standardX ){
+										var tmp_val = obj.maxMove + obj.standardX + Number(obj.mouseEndX);
+										//console.log(tmp_val, Number(obj.mouseEndX));
+										$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + "px, 0px, 0px)"});
+									}else if( Number(obj.mouseEndX) <= obj.widthMaxMoment){
+										var tmp_val = obj.standardX + (obj.maxMove - Number(obj.mouseEndX));
+										console.log("a", tmp_val, obj.widthFullArea, obj.maxMove, Number(obj.mouseEndX));
+										$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + -tmp_val + "px, 0px, 0px)"});
 									}
 
-									obj.thisx = obj.fnTransform3D( obj.target_name );
+									obj.mouseEndX = obj.fnTransform3D( obj.swiper_box );
 									obj.transxReset = false;
 								}
 							}
 						}
-						//console.log("move", obj.thisx, obj.itemMoveWidth, obj.moveLv);
-						//console.log(obj.resultX, Math.floor(obj.resultX / (-obj.itemBundleWidth)), obj.itemBundleWidth);
+						//console.log("move", obj.mouseEndX, obj.widthItem, obj.moveLv);
+						//console.log(obj.resultX, Math.floor(obj.resultX / (-obj.widthBundle)), obj.widthBundle);
 						if(obj.startX != obj.moveX){
-							$(obj.target_name).addClass("animation");
+							$(obj.swiper_box).addClass("animation");
 							if( obj.swipeRight ){
 								// 30% 이상 우측 이동 시 다음으로..
-								obj.moveLv += Math.floor(obj.resultX / (-obj.itemBundleWidth));
-								if(obj.resultX % (-obj.itemBundleWidth) < -obj.itemBundleWidth * 0.3){
+								obj.moveLv += Math.floor(obj.resultX / (-obj.widthBundle));
+								if(obj.resultX % (-obj.widthBundle) < -obj.widthBundle * 0.3){
 									obj.moveLv++;
 								}
 							}else if( !obj.swipeRight ){
 								// 30% 이상 좌측 이동 시 이전으로..
-								obj.moveLv -= Math.floor(obj.resultX / (obj.itemBundleWidth));
-								if(obj.resultX % (obj.itemBundleWidth) > obj.itemBundleWidth * 0.3){
+								obj.moveLv -= Math.floor(obj.resultX / (obj.widthBundle));
+								if(obj.resultX % (obj.widthBundle) > obj.widthBundle * 0.3){
 									obj.moveLv--;
 								}
 							}
-							//console.log(obj.moveLv, obj.pageMax);
+							console.log("fnTouchEnd ::", obj.moveLv, obj.maxPage);
 							if( obj.loop ){
-								if( obj.moveLv > obj.pageMax ){
-									obj.moveLv = obj.moveLv - obj.pageMax;
-								}else if( obj.moveLv < 1 ){
-									obj.moveLv = obj.pageMax + obj.moveLv;
+								if( obj.moveLv > obj.maxPage - 1 ){
+									obj.moveLv = obj.moveLv - obj.maxPage;
+								}else if( obj.moveLv < 0 ){
+									obj.moveLv = obj.maxPage + obj.moveLv;
 								}
 							}else{
-								if( obj.moveLv > obj.pageMax - 1 ){
-									obj.moveLv = obj.pageMax - 1;
+								if( obj.moveLv > obj.maxPage - 1 ){
+									obj.moveLv = obj.maxPage - 1;
 								}else if( obj.moveLv < 0 ){
 									obj.moveLv = 0;
 								}
@@ -614,35 +631,35 @@
 
 				// 자동롤링에 의해 호출 되었을때 대상이 보일때와 안보일때 분기 처리.
 				// 안보이면 자동롤링이 안되게끔 함.
-				if( $(this.target_name).is(":visible") ){
+				if( $(this.swiper_box).is(":visible") ){
 					if( this.loop ){
 						// 고정된 이동은 짝수가 안맞을 경우 사용을 못함...
 						// 기존 최종 이동해야 하는 값을 기억했다가 itembundel 너비 만큼 더해서 이동해야 할거 같음..
-						$(this.target_name).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.itemMoveWidth * (this.preview - this.bundle) - (this.itemBundleWidth * this.moveLv)) + "px, 0px, 0px)"});
-						$(this.target_name).find("> li").removeClass("on").eq(this.preview + (this.moveLv - 1) * this.bundle).addClass("on");
+						$(this.swiper_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.standardX - (this.widthItem * this.moveLv * this.bundle)) + "px, 0px, 0px)"});
+						$(this.swiper_box).find("> li").removeClass("on").eq(this.addItem + this.moveLv * this.bundle).addClass("on");
 
 						if( $.type(this.together_box) === "object" ){
-							$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.itemMoveWidth * (this.preview - this.bundle) - (this.itemBundleWidth * this.moveLv)) + "px, 0px, 0px)"});
+							$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.widthItem * (this.preview - this.bundle) - (this.widthBundle * this.moveLv)) + "px, 0px, 0px)"});
 						}
 					}else{
-						var target_max = -this.itemBundleWidth * this.moveLv + parseFloat($(this.target_name).find("> li").css("marginRight"));
-						$(this.target_name).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.targetMaxMove ? this.targetMaxMove : target_max) + "px, 0px, 0px)"});
-						$(this.target_name).find("> li").removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
+						var target_max = -this.widthBundle * this.moveLv + parseFloat($(this.swiper_box).find("> li").css("marginRight"));console.log("target_max", target_max);
+						$(this.swiper_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
+						$(this.swiper_box).find("> li").removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
 
 						if( $.type(this.together_box) === "object" ){
-							$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.targetMaxMove ? this.targetMaxMove : target_max) + "px, 0px, 0px)"});
+							$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
 						}
 					}
 
-					$(this.target_name).on("transitionend webkitTransitionEnd", function(event) {
+					$(this.swiper_box).on("transitionend webkitTransitionEnd", function(event) {
 						obj.swipeAction = false;
 						clearTimeout(obj.autoSetTime); //자동 롤링 제거
-						$(obj.target_name).removeClass("animation").off("transitionend webkitTransitionEnd");
+						$(obj.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
 					});
 				}else{
 					this.swipeAction = false;
 					clearTimeout(this.autoSetTime); //자동 롤링 제거
-					$(this.target_name).removeClass("animation").off("transitionend webkitTransitionEnd");
+					$(this.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
 					$(this.together_box).off("transitionend webkitTransitionEnd");
 				}
 			},
@@ -667,15 +684,15 @@
 					e.preventDefault();
 				}else{
 					//console.log( $(this), obj.link_go );
-					$("> li", obj.target_name).removeClass("on").eq( $("> li", obj.target_name).index( $(this).closest("li") ) ).addClass("on");
+					$("> li", obj.swiper_box).removeClass("on").eq( $("> li", obj.swiper_box).index( $(this).closest("li") ) ).addClass("on");
 				}
 			},
 
 			// 리사이즈 체크
 			fnResizeChk : function(e) {
 				var obj = e.data;
-				if( obj.cachedWidth != $(window).width() ){
-					obj.cachedWidth = $(window).width();
+				if( obj.widthCached != $(window).width() ){
+					obj.widthCached = $(window).width();
 					obj.fnWidthSet();
 					obj.fnSettings();
 				}
@@ -686,8 +703,8 @@
 <body>
 	<div class="wrap">
 		<strong>기본(그룹1)</strong>
-		<div class="swiper" data-swiper=1>
-			<ul class="item">
+		<div class="swiper_area" data-swiper=1>
+			<ul class="swiper_box">
 				<li><a href="#none">111111111111</a></li>
 				<li><a href="#none">222222222222</a></li>
 				<li><a href="#none">333333333333</a></li>
@@ -698,7 +715,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper1 = new swiper({
-				target_name: $("[data-swiper=1] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=1]"),		// 스와이프 대상
 				//loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -712,8 +729,8 @@
 		</script>
 
 		<strong>기본(그룹1)</strong>
-		<div class="swiper t3" data-swiper=2>
-			<ul class="item" >
+		<div class="swiper_area t3" data-swiper=2>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -730,7 +747,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper2 = new swiper({
-				target_name: $("[data-swiper=2] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=2]"),		// 스와이프 대상
 				//loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				//bundle: 2,										// 보여질 그룹
@@ -744,8 +761,8 @@
 		</script>
 
 		<strong>기본, 그룹2</strong>
-		<div class="swiper t1" data-swiper=3>
-			<ul class="item" >
+		<div class="swiper_area t1" data-swiper=3>
+			<ul class="swiper_box">
 				<li><a href="#none">1111111111111</a></li>
 				<li><a href="#none">2222222222222</a></li>
 				<li><a href="#none">3333333333333</a></li>
@@ -758,7 +775,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper3 = new swiper({
-				target_name: $("[data-swiper=3] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=3]"),		// 스와이프 대상
 				//loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				bundle: 2,										// 보여질 그룹
@@ -772,8 +789,8 @@
 		</script>
 
 		<strong>기본(그룹3)</strong>
-		<div class="swiper t3" data-swiper=4>
-			<ul class="item" >
+		<div class="swiper_area t3" data-swiper=4>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -791,7 +808,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper4 = new swiper({
-				target_name: $("[data-swiper=4] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=4]"),		// 스와이프 대상
 				//loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 3,										// 보여질 그룹
@@ -807,8 +824,8 @@
 		<hr style="margin-top:20px;border-color:#000;" />
 
 		<strong>무한(그룹1)</strong>
-		<div class="swiper" data-swiper=5>
-			<ul class="item" >
+		<div class="swiper_area" data-swiper=5>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -819,7 +836,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper5 = new swiper({
-				target_name: $("[data-swiper=5] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=5]"),		// 스와이프 대상
 				loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -833,8 +850,8 @@
 		</script>
 
 		<strong>무한(그룹1)</strong>
-		<div class="swiper t3" data-swiper=6>
-			<ul class="item" >
+		<div class="swiper_area t3" data-swiper=6>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -851,7 +868,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper6 = new swiper({
-				target_name: $("[data-swiper=6] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=6]"),		// 스와이프 대상
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -865,8 +882,8 @@
 		</script>
 
 		<strong>무한, 그룹3</strong>
-		<div class="swiper t2" data-swiper=7>
-			<ul class="item" >
+		<div class="swiper_area t2" data-swiper=7>
+			<ul class="swiper_box">
 				<li><a href="#none">111111111111111</a></li>
 				<li><a href="#none">222222222222222</a></li>
 				<li><a href="#none">333333333333333</a></li>
@@ -879,7 +896,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper7 = new swiper({
-				target_name: $("[data-swiper=7] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=7]"),		// 스와이프 대상
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 3,										// 보여질 그룹
@@ -893,8 +910,8 @@
 		</script>
 
 		<strong>무한, 그룹2</strong>
-		<div class="swiper t3" data-swiper=8>
-			<ul class="item" >
+		<div class="swiper_area t3" data-swiper=8>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -911,7 +928,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper8 = new swiper({
-				target_name: $("[data-swiper=8] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=8]"),		// 스와이프 대상
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 2,										// 보여질 그룹
@@ -925,8 +942,8 @@
 		</script>
 
 		<strong>무한, 그룹3</strong>
-		<div class="swiper t3" data-swiper=9>
-			<ul class="item" >
+		<div class="swiper_area t3" data-swiper=9>
+			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
 				<li><a href="#none">33333333333</a></li>
@@ -943,7 +960,7 @@
 		</div>
 		<script type="text/javascript">
 			var swiper9 = new swiper({
-				target_name: $("[data-swiper=9] .item"),		// 스와이프 대상
+				target_name: $("[data-swiper=9]"),		// 스와이프 대상
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 3,										// 보여질 그룹
@@ -952,6 +969,32 @@
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=9] .btn_prev"),
 					next: $("[data-swiper=9] .btn_next"),
+				}
+			});
+		</script>
+
+		<strong>무한, 그룹3</strong>
+		<div class="swiper_area t4" data-swiper=10>
+			<ul class="swiper_box">
+				<li><a href="#none">11111111111</a></li>
+				<li><a href="#none">22222222222</a></li>
+				<li><a href="#none">33333333333</a></li>
+				<li><a href="#none">44444444444</a></li>
+			</ul>
+			<button type="button" class="btn_prev">이전</button>
+			<button type="button" class="btn_next">다음</button>
+		</div>
+		<script type="text/javascript">
+			var swiper10 = new swiper({
+				target_name: $("[data-swiper=10]"),		// 스와이프 대상
+				loop: true,										// 무한 설정
+				speed: 600,										// 스와이프 속도
+				bundle: 3,										// 보여질 그룹
+				indicator: true,								// 인디케이터 표시
+				page: true,										// 페이징 넘버 표시
+				navi: {											// 네비(좌,우) 버튼 설정
+					prev: $("[data-swiper=10] .btn_prev"),
+					next: $("[data-swiper=10] .btn_next"),
 				}
 			});
 		</script>
