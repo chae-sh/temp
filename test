@@ -65,15 +65,17 @@
 	<script>
 		// YouTube IFrame Player API
 		// swiper 기능과 함께 사용 됨.
+		// local IE 에서는 API 오류 남. 서버에서 확인 가능
 		var tag = document.createElement('script');
 		tag.src = "https://www.youtube.com/iframe_api";
 
 		var firstScriptTag = document.getElementsByTagName('script')[0];
 		firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
-		var youtubeReady = false;
+		var YTdeferred = $.Deferred();
 		function onYouTubeIframeAPIReady() {
-			youtubeReady = true;
+			YTdeferred.resolve(window.YT);
+			//console.log("onYouTubeIframeAPIReady");
 		}
 		function onPlayerReady(event) {
 			event.target.playVideo();
@@ -97,7 +99,7 @@
 			2021-02-02 : video 태그, youtube api 컨트롤 기능 추가,
 			2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
 			2021-02-03 : spaceBetween 설정 기능 추가
-			2021-02-04 : 요소 걸쳐서 보이는 기능 (alignCenter)
+			2021-02-04 : 요소 걸쳐서 보이는 기능 (alignCenter), youtube 비동기화(Deferred) 체크
 			// freeMode (짝수 안맞을 때, page 기능 사용 못함)
 			// twins(함께 움직이는 요소) 추가
 			// 복제 된 video 요소 playTime 동기화 기능 
@@ -198,6 +200,8 @@
 			this.tmpResizePer = 0;										// 몇 % 움직인 상태인가? 기본값 '0'
 			this.windowActive = true;									// window 활성화 체크
 			this.targetEvent = false;									// 클릭 유무 판단하여, mousemove 이벤트 실행 여부 판단. 기본값 '아니오'
+			this.videoList = [];										// video 대상 ID 목록
+			this.prevVideo = "";										// 이전 재생한 video ID
 
 			this.init();
 		}
@@ -214,7 +218,7 @@
 				}
 
 				// 비디오 체크
-				this.fnVideo();
+				this.fnVideoCheck();
 
 				// 스와이프에 필요한 값 설정
 				this.fnSettings();
@@ -683,12 +687,14 @@
 								obj.moveLv += Math.floor(obj.resultX / (-obj.widthBundle));
 								if(obj.resultX % (-obj.widthBundle) < -obj.widthBundle * 0.3){
 									obj.moveLv++;
+									obj.fnVideoStop();
 								}
 							}else if( !obj.swipeRight ){
 								// 30% 이상 좌측 이동 시 이전으로..
 								obj.moveLv -= Math.floor(obj.resultX / (obj.widthBundle));
 								if(obj.resultX % (obj.widthBundle) > obj.widthBundle * 0.3){
 									obj.moveLv--;
+									obj.fnVideoStop();
 								}
 							}
 							//console.log("fnTouchEnd ::", obj.moveLv, obj.maxPage);
@@ -794,96 +800,116 @@
 			},
 
 			// 비디오 체크
-			fnVideo : function() {
+			fnVideoCheck : function() {
 				var obj = this;
 				var video_temp = [], video_item = [];
-				$(".video", this.swiper_box).each(function(idx){
-					var _idx = $(this).attr("data-index");
+				// 재생 버튼 추가, 영상 배열 만들기
+				$(".video", this.swiper_box).each(function(){
+					var _idx = $(this).children().eq(0).attr("id");
 					$(this).append('<button type="button">재생/정지</button>');
 					if(typeof(_idx) !== "undefined"){
 						video_temp.push(_idx);
-					}else{
-						tryVideoAPI($(this));
 					}
 				});
-				$.each(video_temp, function(index,value){
-					if(video_item.indexOf(value) == -1 ) {
-						video_item.push(value);
-						
-						$('[data-index="' + value + '"]', obj.swiper_box).each(function(idx){
-							var _id= $(this).children().eq(0).attr("id");
-							$(this).children().eq(0).attr("id", _id + idx);
 
-							// 일반 video
-							tryVideoAPI($(this));
+				// YouTube load complate
+				YTdeferred.done(function(YT) {
+					if(obj.loop){
+						$.each(video_temp, function(index,value){
+							if(obj.videoList.indexOf(value) == -1 ) {
+								obj.videoList.push(value);
+								var _dataIDX = $("#" + value).parent().attr("data-index");
+								$('[data-index="' + _dataIDX + '"]', obj.swiper_box).each(function(idx){
+									var _id= $(this).children().eq(0).attr("id");
+									$(this).children().eq(0).attr("id", _id + idx);
+
+									if($(this).children().eq(0).prop("tagName") == "DIV"){
+										obj.fnYoutubeAPI($(this));
+									}else if($(this).children().eq(0).prop("tagName") == "VIDEO"){
+										obj.fnVideoAPI($(this));
+									}
+								});
+							}
 						});
-					}
-				});
-
-				// youtube API
-				function tryYoutubeAPI(){
-					//console.log(obj.targetName, youtubeReady);
-					if(youtubeReady){
-						//onYouTubeIframeAPIReady($(obj.targetName));
-						obj.fnYoutubeAPI();
 					}else{
-						setTimeout(tryYoutubeAPI, 300);
-					}
-				}
-				tryYoutubeAPI();
-
-				// 일반 video
-				function tryVideoAPI(_target) {
-					if($(_target).children().eq(0).prop("tagName") == "VIDEO") {
-						var _id = $(_target).children().eq(0).attr("id");
-						$(_target).find("button").on("click", obj, function(e) {
-							var obj = e.data;
-							if(obj.startX == obj.moveX){
-								if($("#" + _id).get(0).paused){
-									$("#" + _id).get(0).play();
-								}else{
-									$("#" + _id).get(0).pause();
-								}
+						$(".video", obj.swiper_box).each(function(idx){
+							if($(this).children().eq(0).prop("tagName") == "DIV"){
+								obj.fnYoutubeAPI($(this));
+							}else if($(this).children().eq(0).prop("tagName") == "VIDEO"){
+								obj.fnVideoAPI($(this));
 							}
 						});
 					}
-				}
+					//obj.fnYoutubeAPI();
+					//console.log(YT);
+				});
 			},
 
-			// youtube API 로 영상 넣기
-			fnYoutubeAPI : function(){
-				var obj = this;
-				$(".video", this.swiper_box).each(function(idx){
-					var _id, _code;
-					if($(this).children().eq(0).prop("tagName") == "DIV"){
-						_id = $(this).children().eq(0).attr("id");
-						_code = $(this).children().eq(0).attr("data-src");
-						//_code = $(this).children().attr("src").split("/").reverse()[0];
-						eval("\
-						" + _id + " = new YT.Player('" + _id + "', {\
-							width: '400',\
-							height: '517',\
-							videoId: '" + _code + "',\
-							playerVars: {\
-								controls: '0',\
-								autohide: '1',\
-								showinfo: '0'\
-							}\
-						});");
-						$(this).find("button").on("click", obj, function(e){
-							var obj = e.data;
-							eval('_state = ' + _id + '.getPlayerState()');
-							//console.log("button :", _id, _state, obj.startX);
-							if(obj.startX == obj.moveX){
-								if(_state == 0 || _state == 5){
-									eval('' + _id + '.playVideo()');
-								}else{
-									eval('' + _id + '.stopVideo()');
-								}
-							}
-						});
+			// youtube API 
+			fnYoutubeAPI : function(_target){
+				var _id, _code;
+				_id = $(_target).children().eq(0).attr("id");
+				_code = $(_target).children().eq(0).attr("data-src");
+				//_code = $(_target).children().attr("src").split("/").reverse()[0];
+				eval("\
+				" + _id + " = new YT.Player('" + _id + "', {\
+					width: '400',\
+					height: '517',\
+					videoId: '" + _code + "',\
+					playerVars: {\
+						controls: '0',\
+						autohide: '1',\
+						showinfo: '0'\
+					}\
+				});");
+				$(_target).find("button").on("click", this, function(e){
+					var obj = e.data;
+					eval('_state = ' + _id + '.getPlayerState()');
+					//console.log("button :", _id, _state, obj.startX);
+					if(obj.startX == obj.moveX){
+						if(obj.prevVideo != _id){
+							obj.fnVideoStop();
+						}
+
+						if(_state == 0 || _state == 5){
+							eval('' + _id + '.playVideo()');
+						}else{
+							eval('' + _id + '.stopVideo()');
+						}
+						obj.prevVideo = _id;
 					}
 				});
+			},
+
+			// video API
+			fnVideoAPI : function(_target) {
+				var _id = $(_target).children().eq(0).attr("id");
+				$(_target).find("button").on("click", this, function(e) {
+					var obj = e.data;
+					if(obj.startX == obj.moveX){
+						if(obj.prevVideo != _id){
+							obj.fnVideoStop();
+						}
+
+						if($("#" + _id).get(0).paused){
+							$("#" + _id).get(0).play();
+						}else{
+							$("#" + _id).get(0).pause();
+							$("#" + _id).get(0).currentTime = 0;
+						}
+						obj.prevVideo = _id;
+					}
+				});
+			},
+
+			// video stop
+			fnVideoStop : function() {
+				if($("#" + this.prevVideo).prop("tagName") == "IFRAME"){
+					eval('' + this.prevVideo + '.stopVideo()');
+				}else if($("#" + this.prevVideo).prop("tagName") == "VIDEO"){
+					$("#" + this.prevVideo).get(0).pause();
+					$("#" + this.prevVideo).get(0).currentTime = 0;
+				}
 			},
 
 			/* window focus 체크 이벤트 (참고용 소스)
@@ -922,6 +948,64 @@
 				}
 			},
 		}
+
+		// global 함수 만들기
+		// $(document).ready(function(){
+		// 	window.api = function() {
+		// 		console.log("api");
+		// 	}
+		// });
+
+		// currentTime 맞추는 참고용 소스
+		/* 플러그인에 맞춰진 소스. 위 swiper과 호환 안한 원본
+		function videoReady(_target){
+			if($('.video_src', _target).length) {
+				var video_temp = [], video_item = [];
+				$('.video_src', _target).each(function(){
+					video_temp.push($(this).parent().attr("data-swiper-slide-index"));
+				});
+				$.each(video_temp, function(index, value){
+					if(video_item.indexOf(value) == -1 ) {
+						video_item.push(value);
+						
+						$('.visual [data-swiper-slide-index="' + value + '"]').each(function(idx){
+							var _id= $(this).find("video").attr("id");
+							$(this).find("video").attr("id", _id + idx);//console.log($(this).find("video").attr("id"));
+							eval("var " + _id + idx + " = videojs('" + _id + idx + "')");
+						});
+					}
+				});
+			}
+		}
+		function videoSlide(e, _target){
+			var obj = e;
+			var _id, _str, _currentTime;
+			var _video = $('.swiper-slide-active .video_src', _target);
+			if(obj.prev_video != "" && typeof(obj.prev_video) != "undefined"){
+				_id = $(obj.prev_video).children().attr("id");
+				_str = _id.substring(0, _id.length-1);
+				$("[id*='" + _str +"'][id*='_html5_api']").each(function(idx){
+					$(this).get(0).pause();
+				});
+				
+				_currentTime = $("[id*='" + _str +"'][id*='_html5_api']").eq(0).get(0).currentTime;
+				$("[id*='" + _str +"'][id*='_html5_api']").each(function(idx){
+					$(this).get(0).currentTime = _currentTime;
+				});
+				obj.prev_video = "";
+				//console.log("slideChangeTransitionEnd", _currentTime);
+			}
+
+			if($(_video).length){
+				obj.prev_video = _video;
+				_id = $(_video).children().attr("id");
+				_str = _id.substring(0, _id.length-1);
+				$("[id*='" + _str +"'][id*='_html5_api']").each(function(){
+					$(this).get(0).play();
+				});
+			}
+		}
+		*/
 	</script>
 </head>
 <body>
@@ -1363,6 +1447,12 @@
 				//},
 			});
 		</script>
+		<div id="v"></div>
+		<div id="v"></div>
+		<div id="v"></div>
+		<div id="v"></div>
+		<div id="v"></div>
+		<div id="v"></div>
 	</div>
 </body>
 </html>
