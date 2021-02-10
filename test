@@ -10,6 +10,7 @@
 	<script src="jquery-1.12.4.min.js"></script>
 	<style>
 		* { box-sizing: border-box; }
+		/* html {overflow-y:scroll;} 스와이프가 들썩이는 이유는 컨텐츠 높이에 따라 스크롤이 생길때 차이 재계산 */
 		html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
 		form { margin: 0; padding: 0; }
 		img, a { border: 0; color: #666; }
@@ -92,20 +93,28 @@
 		}
 
 		/* #########################################################
-			swiper ver.2.0
-			2020-03-02 : flex 코딩 기반, 배너 종류의 1개 단위 swiper 기능 제작
-			2021-01-28 : bundle 기능 추가 (아이템수 만큼 앞뒤로 복사 = 3배)
-			2021-02-01 : autoplay 기능 추가
-			2021-02-02 : video 태그, youtube api 컨트롤 기능 추가,
-			2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
-			2021-02-03 : spaceBetween 설정 기능 추가
-			2021-02-04 : 요소 걸쳐서 보이는 기능 (alignCenter), youtube 비동기화(Deferred) 체크
+			=== swiper ver.2.1 ===
+			ㄴ2021-02-08 : slide 대상 지정 기능, [initAfter, slideChangeStart, slideChangeEnd] 사용자 추가이벤트 기능
+			ㄴ2021-02-10 : navi 버튼 대상 없으면 기본생성 기능, 특수한 경우(preview 보다 item이 적은 경우) page 수가 최소&최대 넘치는 현상 수정
+
+			=== swiper ver.2.0 ===
+			ㄴ2021-01-28 : bundle 기능 (아이템수 만큼 앞뒤로 복사 = 3배)
+			ㄴ2021-02-01 : autoplay 기능
+			ㄴ2021-02-02 : video 태그, youtube api 컨트롤 기능
+			ㄴ2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
+			ㄴ2021-02-03 : spaceBetween 설정 기능
+			ㄴ2021-02-04 : 요소 걸쳐서 보이는 기능 (alignCenter), youtube 비동기화(Deferred) 체크
+
+			=== swiper ver.1.0 ===
+			ㄴ2020-03-02 : flex 코딩 기반, 배너 종류의 1개 단위 swiper 기능 제작
+			
+			=== 대기 작업 목록 ===
 			// freeMode (짝수 안맞을 때, page 기능 사용 못함)
 			// twins(함께 움직이는 요소) 추가
-			// 복제 된 video 요소 playTime 동기화 기능 
 			// y축 스와이프 기능
 			// 버튼 클릭으로 item 추가 기능 (앞, 뒤 선택)
 			// 버튼 연속 클릭에 텀을 주는 설정
+			// 복제 된 video 요소 playTime 동기화 기능 (보류)
 		#########################################################*/
 		function swiper( args ){
 			// 클릭 & 터치 방식 체크
@@ -144,18 +153,24 @@
 				return target_transX;
 			}
 
-			this.targetName = args.targetName;						// swiper container
-			this.swiper_box = $(".swiper_box", this.targetName);		// swiper box
-			this.loop = args.loop || false;								// 무한, 유한 설정
-			this.page = args.page || false;								// 페이징 설정
-			this.bundle = args.bundle || 1;								// 움직일 슬라이드 그룹 수
-			this.navi = args.navi;										// 네비(좌,우) 버튼 설정
-			this.indicator = args.indicator || false;					// 인디케이터 설정
-			this.autoplay = args.autoplay;								// 자동롤링 설정
-			this.control_group = args.control_group || false;			// 유틸(페이징,인디케이터) 그룹 설정
-			this.speed = args.speed || 400;								// swiper 이동 속도
-			this.spaceBetween = args.spaceBetween || 0;					// item 간격 설정
-			this.alignCenter = args.alignCenter || false;				// item 센터 기준으로 정렬
+			this.targetName = args.targetName;										// swiper container
+			this.swiperBox = $(".swiper_box", this.targetName);						// swiper box
+			this.swiperSlide = args.swiperSlide || $(this.swiperBox).children();	// swiper slide child
+			this.loop = args.loop || false;											// 무한, 유한 설정
+			this.page = args.page || false;											// 페이징 설정
+			this.bundle = args.bundle || 1;											// 움직일 슬라이드 그룹 수
+			this.navi = args.navi;													// 네비(좌,우) 버튼 설정
+			this.indicator = args.indicator || false;								// 인디케이터 설정
+			this.autoplay = args.autoplay;											// 자동롤링 설정
+			this.control_group = args.control_group || false;						// 유틸(페이징,인디케이터) 그룹 설정
+			this.speed = args.speed || 400;											// swiper 이동 속도
+			this.spaceBetween = args.spaceBetween || 0;								// item 간격 설정
+			this.alignCenter = args.alignCenter || false;							// item 센터 기준으로 정렬
+			this.on = args.on || {													// 사용자 추가 이벤트 설정
+				initAfter: function() {}, 											// init() 후 실행
+				slideChangeStart: function() {}, 									// slide change 전 실행
+				slideChangeEnd: function() {},										// slide change 후 실행
+			};
 
 			//this._autoSwipe = args.autoPlay > 0 ? true : false;
 			//this.equal_move = args.equal_move || false;					// 균일한 움직임 설정
@@ -190,6 +205,7 @@
 			this.mouseMoveX = 0;										// 대상이 드래그 한 거리. (mouseMove)
 			this.mouseEndX = 0;											// 대상의 드래그 최종 위치 값. (mouseEnd)
 			this.moveLv = 0;											// 몇 단계로 이동 해야 하는가?
+			this.moveLvPrev = 0;										// 이전 단계 값 저장
 			this.percent = 0;											// 드래그 움직임의 %
 			this.percentXY = 0;											// 드래그 움직임의 좌표값 저장.
 
@@ -224,7 +240,7 @@
 				this.fnSettings();
 
 				if( this.control_group ){
-					$(this.swiper_box).after("<div class='control'></div>");
+					$(this.swiperBox).after("<div class='control'></div>");
 				}
 
 				if( this.indicator ){
@@ -268,21 +284,23 @@
 					//.on("blur", this, this.fnWindowFocus)
 					.on("resize", this, this.fnResizeChk)
 					.on("load", this, this.fnResizeChk);
+
+				this.on.initAfter();
 			},
 
 			// 너비 및 보이는 개수 설정
 			fnWidthSet : function() {
 				if( this.spaceBetween == 0 ){
-					this.spaceBetween = parseFloat($(this.swiper_box).find("> li").css("marginRight"));
+					this.spaceBetween = parseFloat($(this.swiperSlide).css("marginRight"));
 				}else{
-					$(">li", this.swiper_box).css("marginRight", this.spaceBetween + "px");
+					$(">li", this.swiperBox).css("marginRight", this.spaceBetween + "px");
 				}
 
 				this.widthFullArea = $(this.targetName)[0].getBoundingClientRect().width + this.spaceBetween;
-				this.widthItem = $(this.swiper_box).find("> li")[0].getBoundingClientRect().width + this.spaceBetween;
+				this.widthItem = $(this.swiperSlide)[0].getBoundingClientRect().width + this.spaceBetween;
 				this.preview = Math.round(this.widthFullArea / this.widthItem);
 				this.sameItem = (this.bundle == this.preview) ? true : false;
-				this.realItem = $(">li", this.swiper_box).length;
+				this.realItem = $(">li", this.swiperBox).length;
 				this.widthBundle = this.widthItem * this.bundle;
 
 				if(this.alignCenter){
@@ -293,14 +311,14 @@
 
 			// 최대 이동 및 초기 위치 설정
 			fnSettings : function() {
-				this.maxItem = $(">li", this.swiper_box).length;
+				this.maxItem = $(">li", this.swiperBox).length;
 				this.standardX = this.widthItem * this.addItem;
 				this.etcItem = (this.maxItem - (this.addItem * 2)) % this.bundle;
 
 				if( this.loop ){
 					this.maxPage = Math.ceil((this.maxItem - (this.addItem * 2)) / this.bundle);
 
-					$(this.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.standardX - (this.widthItem * this.moveLv * this.bundle) + this.widthAlign) + "px, 0px, 0px)"});
+					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.standardX - (this.widthItem * this.moveLv * this.bundle) + this.widthAlign) + "px, 0px, 0px)"});
 
 					// 최대 이동값 계산.
 					this.maxMove = -this.widthItem * this.realItem -this.standardX;
@@ -316,7 +334,7 @@
 					}
 
 					this.widthFullArea_X2 = $(this.targetName).width() * 2;
-					$(this.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.widthBundle * this.moveLv + this.widthAlign) + "px, 0px, 0px)"});
+					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.widthBundle * this.moveLv + this.widthAlign) + "px, 0px, 0px)"});
 
 					// 최대 이동값 계산.
 					if(this.alignCenter){
@@ -333,7 +351,7 @@
 				}
 
 				//console.log("data-swiper=" + $(this.targetName).attr("data-swiper") + " ::", "max =", this.maxItem, "/ widthBundle=", this.widthBundle, " / widthMaxMoment", this.widthMaxMoment);
- 				$(this.swiper_box).find("> li:eq(" + (this.addItem + this.moveLv * this.bundle) + ")").addClass("on");
+ 				$(this.swiperSlide).eq((this.addItem + this.moveLv * this.bundle)).addClass("on");
 			},
 
 			// 대상의 처음과 끝 객체 복사
@@ -341,7 +359,7 @@
 				var temp_item1 = [];
 				var temp_item2 = [];
 				// li에 index 넘버 설정하기
-				$("> li", this.swiper_box).each(function(idx){
+				$(this.swiperSlide).each(function(idx){
 					$(this).attr("data-index", idx);
 				});
 
@@ -349,25 +367,25 @@
 					this.addItem = this.preview;
 
 					for(var i = 0; i < this.addItem; i++){
-						$("> li:eq(" + i + ")", this.swiper_box).attr("data-index", i);
-						temp_item1[i] = $("> li:eq(" + i + ")", this.swiper_box).clone();
-						temp_item2[i] = $("> li:nth-last-child(" + (i + 1) + ")", this.swiper_box).clone();
+						$(this.swiperSlide).eq(i).attr("data-index", i);
+						temp_item1[i] = $(this.swiperSlide).eq(i).clone();
+						temp_item2[i] = $(this.swiperSlide).eq($(this.swiperSlide).length - 1 - i).clone();
 					}
 					for(var i = 0; i < this.addItem; i++){
-						$(this.swiper_box).append( temp_item1[i] );
-						$(this.swiper_box).prepend( temp_item2[i] );
+						$(this.swiperBox).append( temp_item1[i] );
+						$(this.swiperBox).prepend( temp_item2[i] );
 					};
 				}else{
-					this.addItem = $("> li", this.swiper_box).length;
+					this.addItem = $("> li", this.swiperBox).length;
 
 					for(var i = 0; i < this.addItem; i++){
-						$("> li:eq(" + i + ")", this.swiper_box).attr("data-index", i);
-						temp_item1[i] = $("> li:eq(" + i + ")", this.swiper_box).clone();
-						$(this.swiper_box).append( temp_item1[i] );
+						$(this.swiperSlide).eq(i).attr("data-index", i);
+						temp_item1[i] = $(this.swiperSlide).eq(i).clone();
+						$(this.swiperBox).append( temp_item1[i] );
 					}
 					temp_item1.reverse();
 					for(var i = 0; i < this.addItem; i++){
-						$(this.swiper_box).prepend( temp_item1[i].clone() );
+						$(this.swiperBox).prepend( temp_item1[i].clone() );
 					};
 				}
 
@@ -387,7 +405,7 @@
 				if( this.control_group ){
 					$(this.targetName).find(".control").append( _str );
 				}else{
-					$(this.swiper_box).after( _str );
+					$(this.swiperBox).after( _str );
 				}
 			},
 
@@ -403,7 +421,7 @@
 				if( this.control_group ){
 					$(this.targetName).find(".control").append( _str );
 				}else{
-					$(this.swiper_box).after( _str );
+					$(this.swiperBox).after( _str );
 				}
 
 				var target_indi = $(this.targetName).find(".indicator ul");
@@ -425,18 +443,18 @@
 						obj.moveLv = tmp_conNum;
 						//console.log(obj.moveLv, obj.addItem, obj.moveLv);
 						// 슬라이드에 on 클래스 정의
-						$(obj.swiper_box).find("> li").removeClass("on").eq(obj.addItem + obj.moveLv * obj.bundle).addClass("on");
+						$(obj.swiperBox).find("> li").removeClass("on").eq(obj.addItem + obj.moveLv * obj.bundle).addClass("on");
 
 						$("> li", target_indi).removeClass("on").eq( tmp_conNum ).addClass("on");
 						if( obj.loop ) {
-							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthAlign) + "px, 0px, 0px)"});
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthAlign) + "px, 0px, 0px)"});
 
 							// if( $.type(obj.together_box) === "object" ){
 							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (-obj.widthItem * obj.moveLv)) + "px, 0px, 0px)"});
 							// }
 						}else{
 							var target_max = -obj.widthBundle * obj.moveLv + obj.widthAlign;
-							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
 
 							// if( $.type(obj.together_box) === "object" ){
 							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
@@ -444,7 +462,7 @@
 						}
 
 						// 인디케이터 클릭 후 적용시점에 좌표값 오차 없이 저장하기 위해 적용
-						obj.mouseStartX = obj.fnTransform3D( obj.swiper_box );
+						obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
 
 						// if( $.type(obj.together_box) === "object" ){
 						// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.widthBundle * obj.moveLv) + "px, 0px, 0px)"});
@@ -473,15 +491,24 @@
 			// 네비(좌,우) 버튼 제어
 			fnNavi : function() {
 				var obj = this;
+				if(typeof(this.navi.prev) == "undefined"){
+					$(this.targetName).append('<button type="button" class="btn_prev">이전</button>');
+					this.navi.prev = $(" > .btn_prev", this.targetName);
+				}
+				if(typeof(this.navi.next) == "undefined"){
+					$(this.targetName).append('<button type="button" class="btn_next">다음</button>');
+					this.navi.next = $(" > .btn_next", this.targetName);
+				}
+
 				$(this.navi.prev).on(this.evtTypeStart, this, function(e){
 					obj.moveLv--;
 					if( obj.loop ){
 						if( obj.moveLv < 0 ){
 							obj.moveLv = obj.maxPage - 1;
 							if( obj.etcItem == 0 ){
-								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
+								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
 							}else{
-								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
+								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
 							}
 						}
 					}else{
@@ -510,9 +537,9 @@
 						if( obj.moveLv > obj.maxPage - 1 ){
 							obj.moveLv = 0;
 							if( obj.etcItem == 0 ){
-								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
+								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
 							}else{
-								$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
+								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
 							}
 						}
 					}else{
@@ -576,7 +603,7 @@
 					*/
 					if( !obj.swipeAction ){
 						//target_transX = $(targetName).css("transform").split(",");
-						obj.mouseStartX = obj.fnTransform3D( obj.swiper_box );
+						obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
 						obj.swipeAction = true;
 
 						if( Math.abs(obj.moveX - obj.startX) < Math.abs(obj.moveY - obj.startY) ){
@@ -587,9 +614,9 @@
 						obj.resultX = obj.moveX - obj.startX;
 
 						// animation 클래스가 있다면 중첩 이동을 뜻함.
-						if( $(obj.swiper_box).hasClass("animation") ){
-							obj.mouseStartX = obj.fnTransform3D( obj.swiper_box );
-							$(obj.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
+						if( $(obj.swiperBox).hasClass("animation") ){
+							obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
+							$(obj.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 							$(obj.together_box).off("transitionend webkitTransitionEnd");
 						}
 					}
@@ -606,7 +633,7 @@
 						obj.mouseMoveX = parseInt(obj.mouseStartX) + obj.moveX - obj.startX;
 
 						if( obj.loop ){
-							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
 
 							// if( $.type(obj.together_box) === "object" ){
 							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
@@ -633,7 +660,7 @@
 								}
 								//console.log("우:", obj.percent, obj.mouseMoveX, obj.maxMove);
 							}
-							$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
 						}
 
 						return false;
@@ -657,7 +684,7 @@
 						obj.swipeAction = false;
 					}else if(obj.startX != obj.moveX){
 						// 최종 움직인 위치값 저장
-						obj.mouseEndX = obj.fnTransform3D( obj.swiper_box );
+						obj.mouseEndX = obj.fnTransform3D( obj.swiperBox );
 
 						if( obj.loop ){
 							// 최소, 최대 위치를 넘으면 순간적으로 이동시킴.
@@ -666,14 +693,14 @@
 									if( Number(obj.mouseEndX) >= -obj.standardX + obj.widthAlign){
 										var tmp_val = obj.maxMove + obj.standardX + Number(obj.mouseEndX);
 										//console.log(tmp_val, Number(obj.mouseEndX));
-										$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + "px, 0px, 0px)"});
+										$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + "px, 0px, 0px)"});
 									}else if( Number(obj.mouseEndX) <= obj.widthMaxMoment){
 										var tmp_val = obj.standardX + (obj.maxMove - Number(obj.mouseEndX));
 										//console.log("a", tmp_val, obj.widthFullArea, obj.maxMove, Number(obj.mouseEndX));
-										$(obj.swiper_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + -tmp_val + "px, 0px, 0px)"});
+										$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + -tmp_val + "px, 0px, 0px)"});
 									}
 
-									obj.mouseEndX = obj.fnTransform3D( obj.swiper_box );
+									obj.mouseEndX = obj.fnTransform3D( obj.swiperBox );
 									obj.transxReset = false;
 								}
 							}
@@ -681,7 +708,7 @@
 						//console.log("move", obj.mouseEndX, obj.widthItem, obj.moveLv);
 						//console.log(obj.resultX, Math.floor(obj.resultX / (-obj.widthBundle)), obj.widthBundle);
 						if(obj.startX != obj.moveX){
-							$(obj.swiper_box).addClass("animation");
+							$(obj.swiperBox).addClass("animation");
 							if( obj.swipeRight ){
 								// 30% 이상 우측 이동 시 다음으로..
 								obj.moveLv += Math.floor(obj.resultX / (-obj.widthBundle));
@@ -701,8 +728,14 @@
 							if( obj.loop ){
 								if( obj.moveLv > obj.maxPage - 1 ){
 									obj.moveLv = obj.moveLv - obj.maxPage;
+									if(obj.moveLv > obj.maxPage - 1){
+										obj.moveLv = obj.maxPage - 1;
+									}
 								}else if( obj.moveLv < 0 ){
 									obj.moveLv = obj.maxPage + obj.moveLv;
+									if(obj.moveLv < 0){
+										obj.moveLv = 0;
+									}
 								}
 							}else{
 								if( obj.moveLv > obj.maxPage - 1 ){
@@ -734,42 +767,52 @@
 			// 지정된 위치로 이동 모션
 			fnMoveGo : function() {
 				var obj = this;
+				if(obj.moveLvPrev != obj.moveLv){
+					// 슬라이드 변경 전 실행
+					obj.on.slideChangeStart();
+				}
 
 				// 자동롤링에 의해 호출 되었을때 대상이 보일때와 안보일때 분기 처리.
 				// 안보이면 자동롤링이 안되게끔 함.
-				if( $(this.swiper_box).is(":visible") ){
+				if( $(this.swiperBox).is(":visible") ){
 					if( this.loop ){
 						// 고정된 이동은 짝수가 안맞을 경우 사용을 못함...
 						// 기존 최종 이동해야 하는 값을 기억했다가 itembundel 너비 만큼 더해서 이동해야 할거 같음..
-						$(this.swiper_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.standardX - (this.widthBundle * this.moveLv) + this.widthAlign) + "px, 0px, 0px)"});
-						$(this.swiper_box).find("> li").removeClass("on").eq(this.addItem + this.moveLv * this.bundle).addClass("on");
+						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.standardX - (this.widthBundle * this.moveLv) + this.widthAlign) + "px, 0px, 0px)"});
+						$(this.swiperSlide).removeClass("on").eq(this.addItem + this.moveLv * this.bundle).addClass("on");
 
 						// if( $.type(this.together_box) === "object" ){
 						// 	$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.widthItem * (this.preview - this.bundle) - (this.widthBundle * this.moveLv)) + "px, 0px, 0px)"});
 						// }
 					}else{
 						var target_max = -this.widthBundle * this.moveLv + this.widthAlign;
-						$(this.swiper_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
-						$(this.swiper_box).find("> li").removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
+						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
+						$(this.swiperSlide).removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
 
 						// if( $.type(this.together_box) === "object" ){
 						// 	$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
 						// }
 					}
 
-					$(this.swiper_box).on("transitionend webkitTransitionEnd", function(event) {
+					$(this.swiperBox).on("transitionend webkitTransitionEnd", function(event) {
 						obj.swipeAction = false;
-						$(obj.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
+						$(obj.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 
 						//자동 롤링 재설정
 						if( obj.autoplay ){
 							obj.fnAutoPlay();
 						}
+
+						if(obj.moveLvPrev != obj.moveLv){
+							// 슬라이드 변경 후 실행
+							obj.on.slideChangeEnd();
+							obj.moveLvPrev = obj.moveLv;
+						}
 					});
 				}else{
 					this.swipeAction = false;
 					clearTimeout(this.autoSetTime);
-					$(this.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
+					$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 					$(this.together_box).off("transitionend webkitTransitionEnd");
 				}
 			},
@@ -793,7 +836,7 @@
 			fnAutoPlay : function() {
 				var obj = this;
 				clearTimeout(this.autoSetTime);
-				$(this.swiper_box).removeClass("animation").off("transitionend webkitTransitionEnd");
+				$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 				this.autoSetTime = setTimeout(function() {
 					$(obj.navi.next).trigger(obj.evtTypeStart);
 				},this.autoplay.delay);
@@ -804,7 +847,7 @@
 				var obj = this;
 				var video_temp = [], video_item = [];
 				// 재생 버튼 추가, 영상 배열 만들기
-				$(".video", this.swiper_box).each(function(){
+				$(".video", this.swiperBox).each(function(){
 					var _idx = $(this).children().eq(0).attr("id");
 					$(this).append('<button type="button">재생/정지</button>');
 					if(typeof(_idx) !== "undefined"){
@@ -819,7 +862,7 @@
 							if(obj.videoList.indexOf(value) == -1 ) {
 								obj.videoList.push(value);
 								var _dataIDX = $("#" + value).parent().attr("data-index");
-								$('[data-index="' + _dataIDX + '"]', obj.swiper_box).each(function(idx){
+								$('[data-index="' + _dataIDX + '"]', obj.swiperBox).each(function(idx){
 									var _id= $(this).children().eq(0).attr("id");
 									$(this).children().eq(0).attr("id", _id + idx);
 
@@ -832,7 +875,7 @@
 							}
 						});
 					}else{
-						$(".video", obj.swiper_box).each(function(idx){
+						$(".video", obj.swiperBox).each(function(idx){
 							if($(this).children().eq(0).prop("tagName") == "DIV"){
 								obj.fnYoutubeAPI($(this));
 							}else if($(this).children().eq(0).prop("tagName") == "VIDEO"){
@@ -846,7 +889,7 @@
 			},
 
 			// youtube API 
-			fnYoutubeAPI : function(_target){
+			fnYoutubeAPI : function(_target) {
 				var _id, _code;
 				_id = $(_target).children().eq(0).attr("id");
 				_code = $(_target).children().eq(0).attr("data-src");
@@ -1018,12 +1061,13 @@
 				<li><a href="#none">333333333333</a></li>
 				<li><a href="#none">444444444444</a></li>
 			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+			<!-- <button type="button" class="btn_prev">이전</button>
+			<button type="button" class="btn_next">다음</button> -->
 		</div>
 		<script type="text/javascript">
 			var swiper1 = new swiper({
 				targetName: $("[data-swiper=1]"),				// 스와이프 대상
+				swiperSlide: $("[data-swiper=1] > ul > li"),	// 스와이프 슬라이드 대상 지정
 				//loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -1032,12 +1076,23 @@
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
 				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=1] .btn_prev"),
-					next: $("[data-swiper=1] .btn_next"),
+				// 	prev: $("[data-swiper=1] .btn_prev"),
+				// 	next: $("[data-swiper=1] .btn_next"),
 				},
 				//autoplay: {										// auto play 설정
 				//	delay: 2500,
 				//},
+				on: {
+					initAfter: function() {
+						console.log("initAfter");
+					},
+					slideChangeStart: function() {
+						console.log("slideChangeStart");
+					},
+					slideChangeEnd: function() {
+						console.log("slideChangeEnd");
+					},
+				},
 			});
 		</script>
 
@@ -1061,6 +1116,7 @@
 		<script type="text/javascript">
 			var swiper2 = new swiper({
 				targetName: $("[data-swiper=2]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=2] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				//loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				//bundle: 2,										// 보여질 그룹
@@ -1098,6 +1154,7 @@
 		<script type="text/javascript">
 			var swiper3 = new swiper({
 				targetName: $("[data-swiper=3]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=3] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				//loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 2,										// 보여질 그룹
@@ -1131,6 +1188,7 @@
 		<script type="text/javascript">
 			var swiper4 = new swiper({
 				targetName: $("[data-swiper=4]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=4] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				//loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				bundle: 2,										// 보여질 그룹
@@ -1177,6 +1235,7 @@
 		<script type="text/javascript">
 			var swiper5 = new swiper({
 				targetName: $("[data-swiper=5]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=5] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				//loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 3,										// 보여질 그룹
@@ -1211,6 +1270,7 @@
 		<script type="text/javascript">
 			var swiper6 = new swiper({
 				targetName: $("[data-swiper=6]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=6] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				//speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -1256,6 +1316,7 @@
 		<script type="text/javascript">
 			var swiper7 = new swiper({
 				targetName: $("[data-swiper=7]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=7] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -1289,6 +1350,7 @@
 		<script type="text/javascript">
 			var swiper8 = new swiper({
 				targetName: $("[data-swiper=8]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=8] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				//bundle: 3,										// 보여질 그룹
@@ -1326,6 +1388,7 @@
 		<script type="text/javascript">
 			var swiper9 = new swiper({
 				targetName: $("[data-swiper=9]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=9] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 2,										// 보여질 그룹
@@ -1363,6 +1426,7 @@
 		<script type="text/javascript">
 			var swiper10 = new swiper({
 				targetName: $("[data-swiper=10]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=10] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 3,										// 보여질 그룹
@@ -1380,13 +1444,10 @@
 			});
 		</script>
 
-		<strong><b>[swiper=11]</b> preview:5 / (Bundle:3, Item:4, <span>Loop:true</span>)</strong>
+		<strong><b>[swiper=11]</b> preview:5 / (Bundle:1, Item:1, <span>Loop:true</span>)</strong>
 		<div class="swiper_area t4" data-swiper=11>
 			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
 			</ul>
 			<button type="button" class="btn_prev">이전</button>
 			<button type="button" class="btn_next">다음</button>
@@ -1394,9 +1455,10 @@
 		<script type="text/javascript">
 			var swiper11 = new swiper({
 				targetName: $("[data-swiper=11]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=11] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
-				bundle: 3,										// 보여질 그룹
+				//bundle: 3,										// 보여질 그룹
 				//spaceBetween: 50,									// 간격 설정
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
@@ -1411,7 +1473,7 @@
 			});
 		</script>
 
-		<strong><b>[swiper=12]</b> preview:5 / (Bundle:5, Item:4, <span>Loop:true</span>)</strong>
+		<strong><b>[swiper=12]</b> preview:5 / (Bundle:5, Item:10, <span>Loop:true</span>)</strong>
 		<div class="swiper_area t4" data-swiper=12>
 			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
@@ -1431,6 +1493,7 @@
 		<script type="text/javascript">
 			var swiper12 = new swiper({
 				targetName: $("[data-swiper=12]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=12] > ul > li"),		// 스와이프 슬라이드 대상 지정
 				loop: true,										// 무한 설정
 				speed: 600,										// 스와이프 속도
 				bundle: 5,										// 보여질 그룹
