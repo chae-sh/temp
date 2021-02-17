@@ -62,6 +62,9 @@
 		.swiper_area.t2 .swiper_box > li {width:32%;margin-right:2%;}
 		.swiper_area.t3 .swiper_box > li {width:25%;}
 		.swiper_area.t4 .swiper_box > li {width:20%;}
+
+		.swiper_area.v1 .swiper_box {height:400px;flex-wrap:wrap;}
+		.swiper_area.v1 .swiper_box > li {height:100%;}
 	</style>
 	<script>
 		// YouTube IFrame Player API
@@ -93,9 +96,13 @@
 		}
 
 		/* #########################################################
+			=== swiper ver.2.2 ===
+			ㄴ2021-02-18 : vertical(세로축) 기능 추가
+
 			=== swiper ver.2.1 ===
 			ㄴ2021-02-08 : slide 대상 지정 기능, [initAfter, slideChangeStart, slideChangeEnd] 사용자 추가이벤트 기능
 			ㄴ2021-02-10 : navi 버튼 대상 없으면 기본생성 기능, 특수한 경우(preview 보다 item이 적은 경우) page 수가 최소&최대 넘치는 현상 수정
+			ㄴ2021-02-17 : 최소,최대 이동 제한 bug 수정, swiper mouse text select 기능 막음
 
 			=== swiper ver.2.0 ===
 			ㄴ2021-01-28 : bundle 기능 (아이템수 만큼 앞뒤로 복사 = 3배)
@@ -110,11 +117,11 @@
 			
 			=== 대기 작업 목록 ===
 			// freeMode (짝수 안맞을 때, page 기능 사용 못함)
-			// twins(함께 움직이는 요소) 추가
-			// y축 스와이프 기능
 			// 버튼 클릭으로 item 추가 기능 (앞, 뒤 선택)
 			// 버튼 연속 클릭에 텀을 주는 설정
+
 			// 복제 된 video 요소 playTime 동기화 기능 (보류)
+			// twins(함께 움직이는 요소) 추가 (보류)
 		#########################################################*/
 		function swiper( args ){
 			// 클릭 & 터치 방식 체크
@@ -144,10 +151,18 @@
 
 				if( $(targetName).css("transform").indexOf("3d") > 0){
 					target_transX = $(targetName).css("transform").split(",");
-					target_transX = target_transX[12];
+					if(this.vertical){
+						target_transX = target_transX[13].replace(")","");
+					}else{
+						target_transX = target_transX[12];
+					}
 				}else{
 					target_transX = $(targetName).css("transform").split(",");
-					target_transX = target_transX[4];
+					if(this.vertical){
+						target_transX = target_transX[5].replace(")","");
+					}else{
+						target_transX = target_transX[4];
+					}
 				}
 
 				return target_transX;
@@ -166,6 +181,7 @@
 			this.speed = args.speed || 400;											// swiper 이동 속도
 			this.spaceBetween = args.spaceBetween || 0;								// item 간격 설정
 			this.alignCenter = args.alignCenter || false;							// item 센터 기준으로 정렬
+			this.vertical = args.vertical || false;									// swiper 방향 설정 horizontal or vertical
 			this.on = args.on || {													// 사용자 추가 이벤트 설정
 				initAfter: function() {}, 											// init() 후 실행
 				slideChangeStart: function() {}, 									// slide change 전 실행
@@ -185,29 +201,29 @@
 			this.maxPage;												// page 최대수
 			this.maxMove = 0;											// 최대 이동 가능 거리
 
-			this.widthBundle;											// 묶음 너비
-			this.widthMaxMoment;										// 대상의 최대 직전의 값.(순간적으로 위치를 변경을 하기 위한 기준점)
-			this.widthFullArea = 0;										// 대상을 감싸는 너비 값.
-			this.widthFullArea_X2 = 0;									// 내 영역의 2배 크기 :: $(targetName).parent().width() * 2; <- 100% 일 경우 기본값
-			this.widthItem = 0;											// 대상의 이동 너비 값 (아이템 1개의 너비).
-			this.widthCached = $(window).width();						// 기기 너비
-			this.widthAlign = 0;										// item 센터 정렬에 필요한 값.
+			this.sizeBundle;											// 묶음 너비
+			this.sizeMaxMoment;											// 대상의 최대 직전의 값.(순간적으로 위치를 변경을 하기 위한 기준점)
+			this.sizeFullArea = 0;										// 대상을 감싸는 너비 값.
+			this.sizeFullArea_X2 = 0;									// 내 영역의 2배 크기 :: $(targetName).parent().width() * 2; <- 100% 일 경우 기본값
+			this.sizeItem = 0;											// 대상의 이동 너비 값 (아이템 1개의 너비).
+			this.sizeCached = $(window).width();						// 기기 너비
+			this.sizeAlign = 0;											// item 센터 정렬에 필요한 값.
 
 			this.startX = 0;											// 시작점X.
 			this.startY = 0;											// 시작점Y.
 			this.moveX = 0;												// 좌우로 움직인 거리.
 			this.moveY = 0;												// 상하로 움직인 거리.
-			this.resultX = 0;											// 최종 움직인 거리.
+			this.resultXY = 0;											// 최종 움직인 거리.
 			this.lastXY;												// 첫 클릭 또는 이동한 이벤트에서 xy 좌표값을 구해야 모바일에서 미세한 차이가 안생김.
-			this.standardX = 0;											// 기준이 되는 X 위치 값.
+			this.standardXY = 0;										// 기준이 되는 X or Y 위치 값.
 
-			this.mouseStartX = 0;										// 대상의 처음 위치 값. (mouseStart)
-			this.mouseMoveX = 0;										// 대상이 드래그 한 거리. (mouseMove)
-			this.mouseEndX = 0;											// 대상의 드래그 최종 위치 값. (mouseEnd)
+			this.mouseStart = 0;										// 대상의 처음 위치 값. (mouseStart)
+			this.mouseMove = 0;											// 대상이 드래그 한 거리. (mouseMove)
+			this.mouseEnd = 0;											// 대상의 드래그 최종 위치 값. (mouseEnd)
 			this.moveLv = 0;											// 몇 단계로 이동 해야 하는가?
 			this.moveLvPrev = 0;										// 이전 단계 값 저장
 			this.percent = 0;											// 드래그 움직임의 %
-			this.percentXY = 0;											// 드래그 움직임의 좌표값 저장.
+			this.dragXY = 0;											// 드래그 움직임의 좌표값 저장.
 
 			this.swipeAction = false;									// 대상이 스와이프 중인가? 기본값 '아니오'
 			this.swipeRight = true;										// 스와이프 방향은? 기본값 '우측'
@@ -226,7 +242,7 @@
 			// 초기 실행
 			init : function() {
 				// 기본 너비 값 계산
-				this.fnWidthSet();
+				this.fnSizeSet();
 
 				// 대상의 처음과 끝 객체 복사
 				if( this.loop ){
@@ -257,7 +273,11 @@
 
 				if(this.evtTypeStart != "touchstart"){
 					$(this.targetName)
-						.on(this.evtTypeStart, this, this.fnTouchStart);
+						.on(this.evtTypeStart, this, this.fnTouchStart)
+						.on("selectstart", this, function() {
+							//console.log("selectstart"); 텍스트 선택 막기
+							return false;
+						});
 
 					$(document)
 						.on(this.evtTypeMove, this, this.fnTouchMove)
@@ -289,39 +309,56 @@
 			},
 
 			// 너비 및 보이는 개수 설정
-			fnWidthSet : function() {
-				if( this.spaceBetween == 0 ){
-					this.spaceBetween = parseFloat($(this.swiperSlide).css("marginRight"));
+			fnSizeSet : function() {
+				if(this.vertical){
+					if( this.spaceBetween == 0 ){
+						this.spaceBetween = parseFloat($(this.swiperSlide).css("marginBottom"));
+					}else{
+						$(">li", this.swiperBox).css("marginBottom", this.spaceBetween + "px");
+					}
+
+					this.sizeFullArea = $(this.targetName)[0].getBoundingClientRect().height + this.spaceBetween;
+					this.sizeItem = $(this.swiperSlide)[0].getBoundingClientRect().height + this.spaceBetween;
 				}else{
-					$(">li", this.swiperBox).css("marginRight", this.spaceBetween + "px");
+					if( this.spaceBetween == 0 ){
+						this.spaceBetween = parseFloat($(this.swiperSlide).css("marginRight"));
+					}else{
+						$(">li", this.swiperBox).css("marginRight", this.spaceBetween + "px");
+					}
+
+					this.sizeFullArea = $(this.targetName)[0].getBoundingClientRect().width + this.spaceBetween;
+					this.sizeItem = $(this.swiperSlide)[0].getBoundingClientRect().width + this.spaceBetween;
 				}
 
-				this.widthFullArea = $(this.targetName)[0].getBoundingClientRect().width + this.spaceBetween;
-				this.widthItem = $(this.swiperSlide)[0].getBoundingClientRect().width + this.spaceBetween;
-				this.preview = Math.round(this.widthFullArea / this.widthItem);
+				this.preview = Math.round(this.sizeFullArea / this.sizeItem);
 				this.sameItem = (this.bundle == this.preview) ? true : false;
 				this.realItem = $(">li", this.swiperBox).length;
-				this.widthBundle = this.widthItem * this.bundle;
+				this.sizeBundle = this.sizeItem * this.bundle;
 
 				if(this.alignCenter){
-					this.widthAlign = (this.widthFullArea - this.widthBundle) / 2;
+					this.sizeAlign = (this.sizeFullArea - this.sizeBundle) / 2;
 				}
-				//console.log(this.widthFullArea, this.widthItem, this.preview);
+				//console.log(this.sizeFullArea, this.sizeItem, this.preview);
 			},
 
 			// 최대 이동 및 초기 위치 설정
 			fnSettings : function() {
 				this.maxItem = $(">li", this.swiperBox).length;
-				this.standardX = this.widthItem * this.addItem;
+				this.standardXY = this.sizeItem * this.addItem;
 				this.etcItem = (this.maxItem - (this.addItem * 2)) % this.bundle;
 
 				if( this.loop ){
 					this.maxPage = Math.ceil((this.maxItem - (this.addItem * 2)) / this.bundle);
 
-					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.standardX - (this.widthItem * this.moveLv * this.bundle) + this.widthAlign) + "px, 0px, 0px)"});
+					if(this.vertical){
+						var _str = '0px, ' + (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px';
+					}else{
+						var _str = (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px, 0px';
+					}
+					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 
 					// 최대 이동값 계산.
-					this.maxMove = -this.widthItem * this.realItem -this.standardX;
+					this.maxMove = -this.sizeItem * this.realItem -this.standardXY;
 				}else{
 					if(this.bundle == 1){
 						if(this.alignCenter){
@@ -333,24 +370,30 @@
 						this.maxPage = Math.round(this.maxItem / this.bundle);
 					}
 
-					this.widthFullArea_X2 = $(this.targetName).width() * 2;
-					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-this.widthBundle * this.moveLv + this.widthAlign) + "px, 0px, 0px)"});
+					if(this.vertical){
+						this.sizeFullArea_X2 = $(this.targetName).height() * 2;
+						var _str = '0px, ' + (-this.sizeBundle * this.moveLv + this.sizeAlign) + 'px, 0px';
+					}else{
+						this.sizeFullArea_X2 = $(this.targetName).width() * 2;
+						var _str = (-this.sizeBundle * this.moveLv + this.sizeAlign) + 'px, 0px, 0px';
+					}
+					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 
 					// 최대 이동값 계산.
 					if(this.alignCenter){
-						this.maxMove = this.maxItem * -this.widthItem + this.widthAlign + this.widthBundle;
+						this.maxMove = this.maxItem * -this.sizeItem + this.sizeAlign + this.sizeBundle;
 					}else{
-						this.maxMove = (this.maxItem - this.preview) * -this.widthItem;
+						this.maxMove = (this.maxItem - this.preview) * -this.sizeItem;
 					}
 				}
 
 				if( this.etcItem == 0 ){
-					this.widthMaxMoment = this.maxMove + this.widthBundle + this.widthAlign;
+					this.sizeMaxMoment = this.maxMove + this.sizeBundle + this.sizeAlign;
 				}else{
-					this.widthMaxMoment = this.maxMove + this.widthItem * this.etcItem + this.widthAlign;
+					this.sizeMaxMoment = this.maxMove + this.sizeItem * this.etcItem + this.sizeAlign;
 				}
 
-				//console.log("data-swiper=" + $(this.targetName).attr("data-swiper") + " ::", "max =", this.maxItem, "/ widthBundle=", this.widthBundle, " / widthMaxMoment", this.widthMaxMoment);
+				//console.log("data-swiper=" + $(this.targetName).attr("data-swiper") + " ::", "max =", this.maxItem, "/ sizeBundle=", this.sizeBundle, " / sizeMaxMoment", this.sizeMaxMoment);
  				$(this.swiperSlide).eq((this.addItem + this.moveLv * this.bundle)).addClass("on");
 			},
 
@@ -388,14 +431,6 @@
 						$(this.swiperBox).prepend( temp_item1[i].clone() );
 					};
 				}
-
-				// if( $.type(this.together_box) === "object" ){
-				// 	temp_first = $("> div:first", this.together_box).clone();
-				// 	temp_last = $("> div:last", this.together_box).clone();
-
-				// 	$(this.together_box).append( temp_first );
-				// 	$(this.together_box).prepend( temp_last );
-				// }
 			},
 
 			// 페이지 표시 생성
@@ -447,27 +482,27 @@
 
 						$("> li", target_indi).removeClass("on").eq( tmp_conNum ).addClass("on");
 						if( obj.loop ) {
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthAlign) + "px, 0px, 0px)"});
+							if(obj.vertical){
+								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeAlign) + 'px, 0px';
+							}else{
+								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeAlign) + 'px, 0px, 0px';
+							}
 
-							// if( $.type(obj.together_box) === "object" ){
-							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (-obj.widthItem * obj.moveLv)) + "px, 0px, 0px)"});
-							// }
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}else{
-							var target_max = -obj.widthBundle * obj.moveLv + obj.widthAlign;
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
+							var target_max = -obj.sizeBundle * obj.moveLv + obj.sizeAlign;
 
-							// if( $.type(obj.together_box) === "object" ){
-							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (target_max < obj.maxMove ? obj.maxMove : target_max) + "px, 0px, 0px)"});
-							// }
+							if(obj.vertical){
+								var _str = '0px, ' + (target_max < obj.maxMove ? obj.maxMove : target_max) + 'px, 0px';
+							}else{
+								var _str = (target_max < obj.maxMove ? obj.maxMove : target_max) + 'px, 0px, 0px';
+							}
+
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}
 
 						// 인디케이터 클릭 후 적용시점에 좌표값 오차 없이 저장하기 위해 적용
-						obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
-
-						// if( $.type(obj.together_box) === "object" ){
-						// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.widthBundle * obj.moveLv) + "px, 0px, 0px)"});
-						// 	$("> .evt_con", obj.together_box).css({"height" : ""}).height( $("> .evt_con", obj.together_box).eq( obj.moveLv ).height() );
-						// }
+						obj.mouseStart = obj.fnTransform3D( obj.swiperBox );
 
 						// 페이지 넘버 표시
 						if( obj.page ){
@@ -505,11 +540,21 @@
 					if( obj.loop ){
 						if( obj.moveLv < 0 ){
 							obj.moveLv = obj.maxPage - 1;
-							if( obj.etcItem == 0 ){
-								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
+							if(obj.vertical){
+								if( obj.etcItem == 0 ){
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+								}else{
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+								}
 							}else{
-								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) - (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
+								if( obj.etcItem == 0 ){
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+								}else{
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								}
 							}
+
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}
 					}else{
 						if( obj.moveLv < 0 ){
@@ -536,11 +581,21 @@
 					if( obj.loop ){
 						if( obj.moveLv > obj.maxPage - 1 ){
 							obj.moveLv = 0;
-							if( obj.etcItem == 0 ){
-								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + obj.widthBundle + obj.widthAlign) + "px, 0px, 0px)"});
+							if(obj.vertical){
+								if( obj.etcItem == 0 ){
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+								}else{
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+								}
 							}else{
-								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + (-obj.standardX - (obj.widthBundle * obj.moveLv) + (obj.widthBundle - (obj.bundle - obj.etcItem) * obj.widthItem) + obj.widthAlign) + "px, 0px, 0px)"});
+								if( obj.etcItem == 0 ){
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+								}else{
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								}
 							}
+
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}
 					}else{
 						if( obj.autoplay ){
@@ -576,7 +631,7 @@
 				obj.scrolling = false;
 				obj.transxReset = true;
 				obj.targetEvent = true;
-				obj.percentXY = 0;
+				obj.dragXY = 0;
 
 				var tmp_startXY = obj.fnPageXY(e);
 				obj.startX = tmp_startXY[0];
@@ -603,19 +658,29 @@
 					*/
 					if( !obj.swipeAction ){
 						//target_transX = $(targetName).css("transform").split(",");
-						obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
+						obj.mouseStart = obj.fnTransform3D( obj.swiperBox );
 						obj.swipeAction = true;
 
-						if( Math.abs(obj.moveX - obj.startX) < Math.abs(obj.moveY - obj.startY) ){
-							obj.scrolling = true;
+						if(obj.vertical){
+							if( Math.abs(obj.moveX - obj.startX) > Math.abs(obj.moveY - obj.startY) ){
+								obj.scrolling = true;
+							}
+						}else{
+							if( Math.abs(obj.moveX - obj.startX) < Math.abs(obj.moveY - obj.startY) ){
+								obj.scrolling = true;
+							}
 						}
 					}else{
 						// 얼만큼 움직이었나?
-						obj.resultX = obj.moveX - obj.startX;
+						if(obj.vertical){
+							obj.resultXY = obj.moveY - obj.startY;
+						}else{
+							obj.resultXY = obj.moveX - obj.startX;
+						}
 
 						// animation 클래스가 있다면 중첩 이동을 뜻함.
 						if( $(obj.swiperBox).hasClass("animation") ){
-							obj.mouseStartX = obj.fnTransform3D( obj.swiperBox );
+							obj.mouseStart = obj.fnTransform3D( obj.swiperBox );
 							$(obj.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 							$(obj.together_box).off("transitionend webkitTransitionEnd");
 						}
@@ -623,44 +688,56 @@
 
 					if( !obj.scrolling ){
 						// 스와이프 방향 설정.
-						if(obj.startX - obj.moveX >= 0){
-							obj.swipeRight = true;
+						if(obj.vertical){
+							if(obj.startY - obj.moveY >= 0){
+								obj.swipeRight = true;
+							}else{
+								obj.swipeRight = false;
+							}
+
+							// 최종 가게 될 위치
+							obj.mouseMove = parseInt(obj.mouseStart) + obj.moveY - obj.startY;
+
+							var _str = '0px, ' + obj.mouseMove + 'px, 0px';
 						}else{
-							obj.swipeRight = false;
+							if(obj.startX - obj.moveX >= 0){
+								obj.swipeRight = true;
+							}else{
+								obj.swipeRight = false;
+							}
+
+							// 최종 가게 될 위치
+							obj.mouseMove = parseInt(obj.mouseStart) + obj.moveX - obj.startX;
+
+							var _str = obj.mouseMove + 'px, 0px, 0px';
 						}
 
-						// 최종 가게 될 위치
-						obj.mouseMoveX = parseInt(obj.mouseStartX) + obj.moveX - obj.startX;
-
 						if( obj.loop ){
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
-
-							// if( $.type(obj.together_box) === "object" ){
-							// 	$(obj.together_box).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
-							// }
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}else{
 							// 최종 가게 될 위치를 너비의 2배로 % 하여 절반까지만 움직이게 한다.
 							// %가 절반을 넘으면 다시 되돌아가기 때문에 0.5 까지만 계산한다.
-							if(obj.mouseMoveX > 0 + obj.widthAlign){
-								obj.percent = (obj.widthFullArea_X2 + parseInt(obj.mouseStartX) - obj.mouseMoveX) / obj.widthFullArea_X2;
-								obj.mouseMoveX = parseInt(obj.mouseStartX) + ((obj.moveX - obj.startX) * obj.percent);
-								if(obj.percentXY <= obj.mouseMoveX){
-									obj.percentXY = obj.mouseMoveX;
+							if(obj.mouseMove > 0 + obj.sizeAlign){
+								obj.percent = (obj.sizeFullArea_X2 + parseInt(obj.mouseStart) - obj.mouseMove) / obj.sizeFullArea_X2;
+								obj.mouseMove = parseInt(obj.mouseStart) + ((obj.vertical ? obj.moveY - obj.startY : obj.moveX - obj.startX) * obj.percent);
+								if(obj.dragXY <= obj.mouseMove || obj.percent > 0.5){
+									obj.dragXY = obj.mouseMove;
 								}else{
-									obj.mouseMoveX = obj.percentXY;
+									obj.mouseMove = obj.dragXY;
 								}
-								//console.log("좌:", obj.percent, obj.mouseMoveX, parseInt(obj.mouseStartX), (obj.moveX - obj.startX) * obj.percent);
-							}else if(obj.mouseMoveX < obj.maxMove){
-								obj.percent = (obj.widthFullArea_X2 + obj.mouseMoveX - obj.maxMove) / obj.widthFullArea_X2;
-								obj.mouseMoveX = obj.maxMove + ((obj.mouseMoveX - obj.maxMove) * obj.percent);
-								if(obj.percentXY >= obj.mouseMoveX){
-									obj.percentXY = obj.mouseMoveX;
+								//console.log("좌:", obj.percent, obj.mouseMove, parseInt(obj.mouseStart), (obj.moveX - obj.startX) * obj.percent);
+							}else if(obj.mouseMove < obj.maxMove){
+								obj.percent = (obj.sizeFullArea_X2 + obj.mouseMove - obj.maxMove) / obj.sizeFullArea_X2;
+								obj.mouseMove = obj.maxMove + ((obj.mouseMove - obj.maxMove) * obj.percent);
+								if(obj.dragXY >= obj.mouseMove || obj.percent > 0.5){
+									obj.dragXY = obj.mouseMove;
 								}else{
-									obj.mouseMoveX = obj.percentXY;
+									obj.mouseMove = obj.dragXY;
 								}
-								//console.log("우:", obj.percent, obj.mouseMoveX, obj.maxMove);
+								//console.log("우:", obj.percent, obj.mouseMove, obj.maxMove);
 							}
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + obj.mouseMoveX + "px, 0px, 0px)"});
+							var _str = obj.vertical ? '0px, ' + obj.mouseMove + 'px, 0px' : obj.mouseMove + 'px, 0px, 0px';
+							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 						}
 
 						return false;
@@ -682,44 +759,51 @@
 
 					if( obj.scrolling ){
 						obj.swipeAction = false;
-					}else if(obj.startX != obj.moveX){
+					}else if(obj.vertical ? obj.startY != obj.moveY : obj.startX != obj.moveX){
 						// 최종 움직인 위치값 저장
-						obj.mouseEndX = obj.fnTransform3D( obj.swiperBox );
+						obj.mouseEnd = obj.fnTransform3D( obj.swiperBox );
 
 						if( obj.loop ){
 							// 최소, 최대 위치를 넘으면 순간적으로 이동시킴.
-							if( obj.resultX < -obj.widthBundle * 0.3 && obj.swipeRight || obj.resultX > obj.widthBundle * 0.3 && !obj.swipeRight ){
+							if( obj.resultXY < -obj.sizeBundle * 0.3 && obj.swipeRight || obj.resultXY > obj.sizeBundle * 0.3 && !obj.swipeRight ){
 								if( obj.transxReset ){
-									if( Number(obj.mouseEndX) >= -obj.standardX + obj.widthAlign){
-										var tmp_val = obj.maxMove + obj.standardX + Number(obj.mouseEndX);
-										//console.log(tmp_val, Number(obj.mouseEndX));
-										$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + "px, 0px, 0px)"});
-									}else if( Number(obj.mouseEndX) <= obj.widthMaxMoment){
-										var tmp_val = obj.standardX + (obj.maxMove - Number(obj.mouseEndX));
-										//console.log("a", tmp_val, obj.widthFullArea, obj.maxMove, Number(obj.mouseEndX));
-										$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + -tmp_val + "px, 0px, 0px)"});
+									if( Number(obj.mouseEnd) >= -obj.standardXY + obj.sizeAlign){
+										if(obj.vertical){
+											var tmp_val = '0px, ' + (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px';
+										}else{
+											var tmp_val = (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px, 0px';
+										}
+										//console.log(tmp_val, "/", Number(obj.mouseEnd));
+									}else if( Number(obj.mouseEnd) <= obj.sizeMaxMoment){
+										if(obj.vertical){
+											var tmp_val = '0px, ' + -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px';
+										}else{
+											var tmp_val = -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px, 0px';
+										}
+										//console.log("a", tmp_val, "/", obj.sizeFullArea, obj.maxMove, Number(obj.mouseEnd));
 									}
+									$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + ")"});
 
-									obj.mouseEndX = obj.fnTransform3D( obj.swiperBox );
+									obj.mouseEnd = obj.fnTransform3D( obj.swiperBox );
 									obj.transxReset = false;
 								}
 							}
 						}
-						//console.log("move", obj.mouseEndX, obj.widthItem, obj.moveLv);
-						//console.log(obj.resultX, Math.floor(obj.resultX / (-obj.widthBundle)), obj.widthBundle);
-						if(obj.startX != obj.moveX){
+						//console.log("move", obj.mouseEnd, obj.sizeItem, obj.moveLv);
+						//console.log(obj.resultXY, Math.floor(obj.resultXY / (-obj.sizeBundle)), obj.sizeBundle);
+						if(obj.vertical ? obj.startY != obj.moveY : obj.startX != obj.moveX){
 							$(obj.swiperBox).addClass("animation");
 							if( obj.swipeRight ){
 								// 30% 이상 우측 이동 시 다음으로..
-								obj.moveLv += Math.floor(obj.resultX / (-obj.widthBundle));
-								if(obj.resultX % (-obj.widthBundle) < -obj.widthBundle * 0.3){
+								obj.moveLv += Math.floor(obj.resultXY / (-obj.sizeBundle));
+								if(obj.resultXY % (-obj.sizeBundle) < -obj.sizeBundle * 0.3){
 									obj.moveLv++;
 									obj.fnVideoStop();
 								}
 							}else if( !obj.swipeRight ){
 								// 30% 이상 좌측 이동 시 이전으로..
-								obj.moveLv -= Math.floor(obj.resultX / (obj.widthBundle));
-								if(obj.resultX % (obj.widthBundle) > obj.widthBundle * 0.3){
+								obj.moveLv -= Math.floor(obj.resultXY / (obj.sizeBundle));
+								if(obj.resultXY % (obj.sizeBundle) > obj.sizeBundle * 0.3){
 									obj.moveLv--;
 									obj.fnVideoStop();
 								}
@@ -776,22 +860,22 @@
 				// 안보이면 자동롤링이 안되게끔 함.
 				if( $(this.swiperBox).is(":visible") ){
 					if( this.loop ){
-						// 고정된 이동은 짝수가 안맞을 경우 사용을 못함...
-						// 기존 최종 이동해야 하는 값을 기억했다가 itembundel 너비 만큼 더해서 이동해야 할거 같음..
-						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.standardX - (this.widthBundle * this.moveLv) + this.widthAlign) + "px, 0px, 0px)"});
+						if(this.vertical){
+							var _str = '0px, ' + (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px';
+						}else{
+							var _str = (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px, 0px';
+						}
+						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + _str + ")"});
 						$(this.swiperSlide).removeClass("on").eq(this.addItem + this.moveLv * this.bundle).addClass("on");
-
-						// if( $.type(this.together_box) === "object" ){
-						// 	$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (-this.widthItem * (this.preview - this.bundle) - (this.widthBundle * this.moveLv)) + "px, 0px, 0px)"});
-						// }
 					}else{
-						var target_max = -this.widthBundle * this.moveLv + this.widthAlign;
-						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
+						var target_max = -this.sizeBundle * this.moveLv + this.sizeAlign;
+						if(this.vertical){
+							var _str = '0px, ' + (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px';
+						}else{
+							var _str = (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px, 0px';
+						}
+						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + _str + ")"});
 						$(this.swiperSlide).removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
-
-						// if( $.type(this.together_box) === "object" ){
-						// 	$(this.together_box).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + (target_max < this.maxMove ? this.maxMove : target_max) + "px, 0px, 0px)"});
-						// }
 					}
 
 					$(this.swiperBox).on("transitionend webkitTransitionEnd", function(event) {
@@ -821,7 +905,7 @@
 			fnLink : function(e) {
 				var obj = e.data;
 				//console.log("fnLink :", obj.startX, obj.moveX);
-				if( obj.startX != obj.moveX ){
+				if(obj.vertical ? obj.startY != obj.moveY : obj.startX != obj.moveX){
 					if(obj.evtTypeStart != "touchstart"){
 						e.preventDefault();
 					}
@@ -984,9 +1068,9 @@
 			// 리사이즈 체크
 			fnResizeChk : function(e) {
 				var obj = e.data;
-				if( obj.widthCached != $(window).width() ){
-					obj.widthCached = $(window).width();
-					obj.fnWidthSet();
+				if( obj.sizeCached != $(window).width() ){
+					obj.sizeCached = $(window).width();
+					obj.fnSizeSet();
 					obj.fnSettings();
 				}
 			},
@@ -1504,6 +1588,86 @@
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=12] .btn_prev"),
 					next: $("[data-swiper=12] .btn_next"),
+				},
+				//autoplay: {										// auto play 설정
+				//	delay: 3000,
+				//},
+			});
+		</script>
+
+		<hr />
+
+		<strong><b>[swiper=13]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true</span>)</strong>
+		<div class="swiper_area v1" data-swiper=13>
+			<ul class="swiper_box">
+				<li><a href="#none">11111111111</a></li>
+				<li><a href="#none">22222222222</a></li>
+				<li><a href="#none">33333333333</a></li>
+				<li><a href="#none">44444444444</a></li>
+				<li><a href="#none">55555555555</a></li>
+				<li><a href="#none">66666666666</a></li>
+				<li><a href="#none">77777777777</a></li>
+				<li><a href="#none">88888888888</a></li>
+				<li><a href="#none">99999999999</a></li>
+				<li><a href="#none">10,10,10,10</a></li>
+			</ul>
+			<button type="button" class="btn_prev">이전</button>
+			<button type="button" class="btn_next">다음</button>
+		</div>
+		<script type="text/javascript">
+			var swiper13 = new swiper({
+				targetName: $("[data-swiper=13]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=13] > ul > li"),		// 스와이프 슬라이드 대상 지정
+				//loop: true,										// 무한 설정
+				speed: 600,										// 스와이프 속도
+				//bundle: 5,										// 보여질 그룹
+				//spaceBetween: 50,									// 간격 설정
+				//alignCenter: true,								// item 센터 정렬
+				indicator: true,								// 인디케이터 표시
+				page: true,										// 페이징 넘버 표시
+				vertical: true,									// 수직 설정
+				navi: {											// 네비(좌,우) 버튼 설정
+					prev: $("[data-swiper=13] .btn_prev"),
+					next: $("[data-swiper=13] .btn_next"),
+				},
+				//autoplay: {										// auto play 설정
+				//	delay: 3000,
+				//},
+			});
+		</script>
+
+		<strong><b>[swiper=14]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true, Loop:true</span>)</strong>
+		<div class="swiper_area v1" data-swiper=14>
+			<ul class="swiper_box">
+				<li><a href="#none">11111111111</a></li>
+				<li><a href="#none">22222222222</a></li>
+				<li><a href="#none">33333333333</a></li>
+				<li><a href="#none">44444444444</a></li>
+				<li><a href="#none">55555555555</a></li>
+				<li><a href="#none">66666666666</a></li>
+				<li><a href="#none">77777777777</a></li>
+				<li><a href="#none">88888888888</a></li>
+				<li><a href="#none">99999999999</a></li>
+				<li><a href="#none">10,10,10,10</a></li>
+			</ul>
+			<button type="button" class="btn_prev">이전</button>
+			<button type="button" class="btn_next">다음</button>
+		</div>
+		<script type="text/javascript">
+			var swiper14 = new swiper({
+				targetName: $("[data-swiper=14]"),				// 스와이프 대상
+				//swiperSlide: $("[data-swiper=14] > ul > li"),		// 스와이프 슬라이드 대상 지정
+				loop: true,										// 무한 설정
+				speed: 600,										// 스와이프 속도
+				//bundle: 5,										// 보여질 그룹
+				//spaceBetween: 50,									// 간격 설정
+				//alignCenter: true,								// item 센터 정렬
+				indicator: true,								// 인디케이터 표시
+				page: true,										// 페이징 넘버 표시
+				vertical: true,									// 수직 설정
+				navi: {											// 네비(좌,우) 버튼 설정
+					prev: $("[data-swiper=14] .btn_prev"),
+					next: $("[data-swiper=14] .btn_next"),
 				},
 				//autoplay: {										// auto play 설정
 				//	delay: 3000,
