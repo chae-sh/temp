@@ -97,20 +97,22 @@
 
 		/* #########################################################
 			=== swiper ver.2.2 ===
+			ㄴ2021-02-24 : swiper 재정의 시 생기는 이벤트 중복 버그 수정, 크롬 개발자도구에서 이벤트 삭제 시 모든이벤트 삭제 되어 document 할당 이벤트는 function 으로 변경
+			ㄴ2021-02-23 : simulateTouch(터치 유무) 설정 기능 추가
 			ㄴ2021-02-18 : vertical(세로축) 기능 추가
 
 			=== swiper ver.2.1 ===
-			ㄴ2021-02-08 : slide 대상 지정 기능, [initAfter, slideChangeStart, slideChangeEnd] 사용자 추가이벤트 기능
-			ㄴ2021-02-10 : navi 버튼 대상 없으면 기본생성 기능, 특수한 경우(preview 보다 item이 적은 경우) page 수가 최소&최대 넘치는 현상 수정
 			ㄴ2021-02-17 : 최소,최대 이동 제한 bug 수정, swiper mouse text select 기능 막음
+			ㄴ2021-02-10 : navi 버튼 대상 없으면 기본생성 기능, 특수한 경우(preview 보다 item이 적은 경우) page 수가 최소&최대 넘치는 현상 수정
+			ㄴ2021-02-08 : slide 대상 지정 기능, [initAfter, slideChangeStart, slideChangeEnd] 사용자 추가이벤트 기능
 
 			=== swiper ver.2.0 ===
-			ㄴ2021-01-28 : bundle 기능 (아이템수 만큼 앞뒤로 복사 = 3배)
-			ㄴ2021-02-01 : autoplay 기능
-			ㄴ2021-02-02 : video 태그, youtube api 컨트롤 기능
-			ㄴ2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
-			ㄴ2021-02-03 : spaceBetween 설정 기능
 			ㄴ2021-02-04 : 요소 걸쳐서 보이는 기능 (alignCenter), youtube 비동기화(Deferred) 체크
+			ㄴ2021-02-03 : spaceBetween 설정 기능
+			ㄴ2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
+			ㄴ2021-02-02 : video 태그, youtube api 컨트롤 기능
+			ㄴ2021-02-01 : autoplay 기능
+			ㄴ2021-01-28 : bundle 기능 (아이템수 만큼 앞뒤로 복사 = 3배)
 
 			=== swiper ver.1.0 ===
 			ㄴ2020-03-02 : flex 코딩 기반, 배너 종류의 1개 단위 swiper 기능 제작
@@ -124,15 +126,18 @@
 			// twins(함께 움직이는 요소) 추가 (보류)
 		#########################################################*/
 		function swiper( args ){
+			// 이벤트 구분을 위한 값
+			this.countSwiper = args.targetName.attr("data-swiper");
+
 			// 클릭 & 터치 방식 체크
 			if( document.ontouchstart !== null ){
-				this.evtTypeStart = "mousedown";
-				this.evtTypeMove = "mousemove";
-				this.evtTypeEnd = "mouseup";
+				this.evtTypeStart = "mousedown.swiper" + this.countSwiper;
+				this.evtTypeMove = "mousemove.swiper" + this.countSwiper;
+				this.evtTypeEnd = "mouseup.swiper" + this.countSwiper;
 			}else{
-				this.evtTypeStart = "touchstart";
-				this.evtTypeMove = "touchmove";
-				this.evtTypeEnd = "touchend";
+				this.evtTypeStart = "touchstart.swiper" + this.countSwiper;
+				this.evtTypeMove = "touchmove.swiper" + this.countSwiper;
+				this.evtTypeEnd = "touchend.swiper" + this.countSwiper;
 			}
 
 			// 좌표 체크
@@ -177,11 +182,12 @@
 			this.navi = args.navi;													// 네비(좌,우) 버튼 설정
 			this.indicator = args.indicator || false;								// 인디케이터 설정
 			this.autoplay = args.autoplay;											// 자동롤링 설정
-			this.control_group = args.control_group || false;						// 유틸(페이징,인디케이터) 그룹 설정
+			this.controlGroup = args.controlGroup || false;							// 유틸(페이징,인디케이터) 그룹 설정
 			this.speed = args.speed || 400;											// swiper 이동 속도
 			this.spaceBetween = args.spaceBetween || 0;								// item 간격 설정
 			this.alignCenter = args.alignCenter || false;							// item 센터 기준으로 정렬
 			this.vertical = args.vertical || false;									// swiper 방향 설정 horizontal or vertical
+			this.simulateTouch = (args.simulateTouch != false ? true : false);		// 터치 기능 설정
 			this.on = args.on || {													// 사용자 추가 이벤트 설정
 				initAfter: function() {}, 											// init() 후 실행
 				slideChangeStart: function() {}, 									// slide change 전 실행
@@ -241,6 +247,8 @@
 		swiper.prototype = {
 			// 초기 실행
 			init : function() {
+				var obj = this;
+
 				// 기본 너비 값 계산
 				this.fnSizeSet();
 
@@ -255,7 +263,7 @@
 				// 스와이프에 필요한 값 설정
 				this.fnSettings();
 
-				if( this.control_group ){
+				if( this.controlGroup ){
 					$(this.swiperBox).after("<div class='control'></div>");
 				}
 
@@ -273,31 +281,40 @@
 
 				if(this.evtTypeStart != "touchstart"){
 					$(this.targetName)
-						.on(this.evtTypeStart, this, this.fnTouchStart)
-						.on("selectstart", this, function() {
+						.off(this.evtTypeStart)
+						.on(this.evtTypeStart, this, this.fnTouchStart);
+
+					if(this.simulateTouch){
+						$(this.targetName)
+							.off("selectstart.textSelect")
+							.on("selectstart.textSelect", this, function() {
 							//console.log("selectstart"); 텍스트 선택 막기
 							return false;
 						});
+					}
 
 					$(document)
-						.on(this.evtTypeMove, this, this.fnTouchMove)
-						.on(this.evtTypeEnd, this, this.fnTouchEnd);
+						.off(this.evtTypeMove).off(this.evtTypeEnd)
+						.on(this.evtTypeMove, this, function(e) {obj.fnTouchMove(e)})
+						.on(this.evtTypeEnd, this, function(e) {obj.fnTouchEnd(e)});
 				}else{
 					$(this.targetName)
+						.off(this.evtTypeStart).off(this.evtTypeMove).off(this.evtTypeEnd)
 						.on(this.evtTypeStart, this, this.fnTouchStart)
 						.on(this.evtTypeMove, this, this.fnTouchMove)
 						.on(this.evtTypeEnd, this, this.fnTouchEnd);
 				}
 
 				$(this.targetName)
-					.on("click", "a, button", this, this.fnLink);
+					.off("click.link", "a, button")
+					.on("click.link", "a, button", this, this.fnLink);
 
 				if( this.autoplay ){
 					this.fnAutoPlay();
 				}
 
 				$(document)
-					.on("visibilitychange", this, this.fnVisibility);
+					.on("visibilitychange", this, function(e) {obj.fnVisibility(e)});
 
 				$(window)
 					//.on("focus", this, this.fnWindowFocus)
@@ -437,10 +454,10 @@
 			fnMakePage : function() {
 				var _str = "<div class='page'><em>1</em>/<span>" + this.maxPage + "</span></div>";
 
-				if( this.control_group ){
-					$(this.targetName).find(".control").append( _str );
+				if( this.controlGroup ){
+					$(this.targetName).find(".control").find(".page").remove().end().append( _str );
 				}else{
-					$(this.swiperBox).after( _str );
+					$(this.swiperBox).siblings(".page").remove().end().after( _str );
 				}
 			},
 
@@ -453,10 +470,10 @@
 			fnMakeIndicator : function() {
 				var obj = this;
 				var _str = "<div class='indicator'><ul></ul></div>";
-				if( this.control_group ){
-					$(this.targetName).find(".control").append( _str );
+				if( this.controlGroup ){
+					$(this.targetName).find(".control").find(".indicator").remove().end().append( _str );
 				}else{
-					$(this.swiperBox).after( _str );
+					$(this.swiperBox).siblings(".indicator").remove().end().after( _str );
 				}
 
 				var target_indi = $(this.targetName).find(".indicator ul");
@@ -470,7 +487,7 @@
 				function fnEventIndicator() {
 					$("> li:first", target_indi).addClass("on");
 
-					$(target_indi).on("click", "a", function(e) {
+					$(target_indi).off("click.indicator").on("click.indicator", "a", function(e) {
 						//자동 롤링 제거
 						clearTimeout(obj.autoSetTime); 
 
@@ -527,15 +544,17 @@
 			fnNavi : function() {
 				var obj = this;
 				if(typeof(this.navi.prev) == "undefined"){
+					$(" > .btn_prev", this.targetName).remove();
 					$(this.targetName).append('<button type="button" class="btn_prev">이전</button>');
 					this.navi.prev = $(" > .btn_prev", this.targetName);
 				}
 				if(typeof(this.navi.next) == "undefined"){
+					$(" > .btn_next", this.targetName).remove();
 					$(this.targetName).append('<button type="button" class="btn_next">다음</button>');
 					this.navi.next = $(" > .btn_next", this.targetName);
 				}
 
-				$(this.navi.prev).on(this.evtTypeStart, this, function(e){
+				$(this.navi.prev).off(this.evtTypeStart).on(this.evtTypeStart, this, function(e){
 					obj.moveLv--;
 					if( obj.loop ){
 						if( obj.moveLv < 0 ){
@@ -576,7 +595,7 @@
 					e.stopPropagation();
 				});
 
-				$(this.navi.next).on(this.evtTypeStart, this, function(e){
+				$(this.navi.next).off(this.evtTypeStart).on(this.evtTypeStart, this, function(e){
 					obj.moveLv++;
 					if( obj.loop ){
 						if( obj.moveLv > obj.maxPage - 1 ){
@@ -628,16 +647,18 @@
 				var obj = e.data;
 				clearTimeout(obj.autoSetTime);
 
-				obj.scrolling = false;
-				obj.transxReset = true;
-				obj.targetEvent = true;
-				obj.dragXY = 0;
+				if(obj.simulateTouch){
+					obj.scrolling = false;
+					obj.transxReset = true;
+					obj.targetEvent = true;
+					obj.dragXY = 0;
 
-				var tmp_startXY = obj.fnPageXY(e);
-				obj.startX = tmp_startXY[0];
-				obj.startY = tmp_startXY[1];
+					var tmp_startXY = obj.fnPageXY(e);
+					obj.startX = tmp_startXY[0];
+					obj.startY = tmp_startXY[1];
 
-				obj.lastXY = e;
+					obj.lastXY = e;
+				}
 
 				e.stopPropagation();
 			},
@@ -1133,11 +1154,42 @@
 			}
 		}
 		*/
+
+		/* IntersectionObserver 
+		$(document).ready(function(){
+			if (window.IntersectionObserver) {
+				var io = new IntersectionObserver(callback,{
+					threshold:1
+				});
+			}
+			function callback(_target){
+				console.log(_target, _target[0].intersectionRatio);
+				if(_target[0].intersectionRatio == 1){
+					console.log(1);
+				}else{
+
+				}
+			}
+			io.observe($("[data-swiper=9]")[0]);
+
+
+			//getBoundingClientRect
+			//$('[data-swiper="1"]').parents(':hidden')
+		});
+		*/
 	</script>
 </head>
+
+
+
+
+
+
+
+
 <body>
 	<div class="wrap">
-		<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:false</span>, spaceBetween:50)</strong>
+		<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:false, simulateTouch:false</span>, spaceBetween:50)</strong>
 		<div class="swiper_area" data-swiper=1>
 			<ul class="swiper_box">
 				<li><a href="#none">111111111111</a></li>
@@ -1159,6 +1211,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				simulateTouch: false,							// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 				// 	prev: $("[data-swiper=1] .btn_prev"),
 				// 	next: $("[data-swiper=1] .btn_next"),
@@ -1208,6 +1262,8 @@
 				alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=2] .btn_prev"),
 					next: $("[data-swiper=2] .btn_next"),
@@ -1246,6 +1302,8 @@
 				alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=3] .btn_prev"),
 					next: $("[data-swiper=3] .btn_next"),
@@ -1280,6 +1338,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=4] .btn_prev"),
 					next: $("[data-swiper=4] .btn_next"),
@@ -1327,6 +1387,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=5] .btn_prev"),
 					next: $("[data-swiper=5] .btn_next"),
@@ -1362,6 +1424,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=6] .btn_prev"),
 					next: $("[data-swiper=6] .btn_next"),
@@ -1408,6 +1472,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=7] .btn_prev"),
 					next: $("[data-swiper=7] .btn_next"),
@@ -1442,6 +1508,8 @@
 				alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=8] .btn_prev"),
 					next: $("[data-swiper=8] .btn_next"),
@@ -1453,7 +1521,7 @@
 		</script>
 
 		<strong><b>[swiper=9]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:true</span>, spaceBetween:50, alignCenter:true)</strong>
-		<div class="swiper_area t3" data-swiper=9>
+		<div class="swiper_area t3" data-swiper=9 id="a">
 			<ul class="swiper_box">
 				<li><a href="#none">11111111111</a></li>
 				<li><a href="#none">22222222222</a></li>
@@ -1480,6 +1548,8 @@
 				alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=9] .btn_prev"),
 					next: $("[data-swiper=9] .btn_next"),
@@ -1518,6 +1588,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=10] .btn_prev"),
 					next: $("[data-swiper=10] .btn_next"),
@@ -1547,6 +1619,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=11] .btn_prev"),
 					next: $("[data-swiper=11] .btn_next"),
@@ -1585,6 +1659,8 @@
 				//alignCenter: true,								// item 센터 정렬
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
+				//vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=12] .btn_prev"),
 					next: $("[data-swiper=12] .btn_next"),
@@ -1626,6 +1702,7 @@
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
 				vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=13] .btn_prev"),
 					next: $("[data-swiper=13] .btn_next"),
@@ -1665,6 +1742,7 @@
 				indicator: true,								// 인디케이터 표시
 				page: true,										// 페이징 넘버 표시
 				vertical: true,									// 수직 설정
+				//simulateTouch: false,								// 터치 기능 설정
 				navi: {											// 네비(좌,우) 버튼 설정
 					prev: $("[data-swiper=14] .btn_prev"),
 					next: $("[data-swiper=14] .btn_next"),
