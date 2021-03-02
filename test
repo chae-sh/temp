@@ -1012,15 +1012,21 @@
 				var obj = this;
 				clearTimeout(this.autoSetTime);
 				$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
-				this.autoSetTime = setTimeout(function() {
-					// $(obj.navi.next).trigger(obj.evtTypeStart);
-					// 네비 버튼이 없어도 자동이동이 필요할 수 있어서 fnNextMove 호출
-					if( $(obj.swiperBox).is(":visible") ){
-						obj.fnNextMove(obj);
-					}else{
+				if( $(this.swiperBox).is(":visible") ){
+					this.autoSetTime = setTimeout(function() {
+						if( $(obj.swiperBox).is(":visible") ){
+							// $(obj.navi.next).trigger(obj.evtTypeStart);
+							// 네비 버튼이 없어도 자동이동이 필요할 수 있어서 fnNextMove 호출
+							obj.fnNextMove(obj);
+						}else{
+							obj.fnAutoPlay();
+						}
+					},this.autoplay.delay);
+				}else{
+					this.autoSetTime = setTimeout(function() {
 						obj.fnAutoPlay();
-					}
-				},this.autoplay.delay);
+					},this.autoplay.delay);
+				}
 			},
 
 			// 비디오 체크
