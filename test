@@ -33,16 +33,16 @@
 		::-ms-input-placeholder { color: #bfbfbf; }
 
 		.wrap {swidth:1280px;margin:0 auto;padding:20px;overflow:hidden;}
-		.wrap > strong {padding-bottom:5px;text-align:center;display:block;}
-		.wrap > strong b {color:red;}
-		.wrap > strong span {color:blue;}
+		.wrap > div ~ div {margin-top:30px;}
+		.wrap > div > strong {padding-bottom:5px;text-align:center;display:block;}
+		.wrap > div > strong b {color:red;}
+		.wrap > div > strong span {color:blue;}
 		.wrap hr ~ strong b {color:blue;}
 		.wrap hr ~ strong span {color:red;}
 		.wrap hr {border-color:#000;}
 		.wrap .swiper_area ~ hr {margin-top:20px;}
 		.wrap .swiper_area ~ hr + hr {margin-top:8px;}
 		.swiper_area {position:relative;background-color:#999;overflow:hidden;}
-		.swiper_area ~ strong {margin-top:30px;}
 		.swiper_area .swiper_box {width:100%;height:200px;display:flex;flex-wrap:nowrap;}
 		.swiper_area .swiper_box > li {position:relative;width:100%;border:1px solid red;background-color:#ccc;flex:1 0 auto;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:0 0 auto;}
 		.swiper_area .swiper_box .video video, 
@@ -96,8 +96,13 @@
 		}
 
 		/* #########################################################
+			=== swiper ver.2.3 ===
+			ㄴ2021-03-03 : autoplay 기능 숨겨진 요소는 안움직이게 수정
+			ㄴ2021-03-02 : DOM 요소 변화 감지(MutationObserver) 기능 추가 > IE11 부터 지원
+
 			=== swiper ver.2.2 ===
-			ㄴ2021-02-24 : swiper 재정의 시 생기는 이벤트 중복 버그 수정, 크롬 개발자도구에서 이벤트 삭제 시 모든이벤트 삭제 되어 document 할당 이벤트는 function 으로 변경
+			ㄴ2021-02-25 : 크롬 개발자도구에서 이벤트 삭제 시 모든이벤트 삭제 되어 document 할당 이벤트는 function 으로 변경
+			ㄴ2021-02-24 : swiper 재정의 시 생기는 이벤트 중복 버그 수정
 			ㄴ2021-02-23 : simulateTouch(터치 유무) 설정 기능 추가
 			ㄴ2021-02-18 : vertical(세로축) 기능 추가
 
@@ -240,6 +245,8 @@
 			this.targetEvent = false;									// 클릭 유무 판단하여, mousemove 이벤트 실행 여부 판단. 기본값 '아니오'
 			this.videoList = [];										// video 대상 ID 목록
 			this.prevVideo = "";										// 이전 재생한 video ID
+			this._observe = true;
+			this.rect = $(this.targetName)[0].getBoundingClientRect();
 
 			this.init();
 		}
@@ -322,7 +329,53 @@
 					.on("resize", this, this.fnResizeChk)
 					.on("load", this, this.fnResizeChk);
 
+				// 대상이 보이는 상태인지, 감춰진 상태인지 체크
+				if(window.MutationObserver){
+					this.fnObserve();
+				}
+
 				this.on.initAfter();
+			},
+
+			// 대상이 보이는지, 감춰진 상태인지 체크
+			fnObserve : function() {
+				var obj = this;
+
+				if(this.rect.width == 0 && this.rect.height == 0){
+					this._observe = false;
+
+					var dom = new MutationObserver(DOMcallback);
+					function DOMcallback(e){
+						//console.log(e, e[0].target, e[0].type, $(e[0].target).is(":hidden"), obj._observe);
+						if(!$(obj.targetName).is(":hidden") && e[0].type == "attributes" && !obj._observe){
+							//console.log("observe");
+							obj.fnInitSetting();
+							obj._observe = true;
+						}else if($(obj.targetName).is(":hidden") && e[0].type == "attributes" && obj._observe){
+							obj._observe = false;
+						}
+					}
+
+					dom.observe($(this.targetName)[0], {
+						attributes: true,
+						childList: false,
+						//characterData: true,
+						//subtree: true || null,
+						attributeOldValue: true || null,
+						//characterDataOldValue: true || null,
+					});
+
+					$(this.targetName).parents(':hidden').each(function(){
+						dom.observe($(this)[0], {
+							attributes: true,
+							//childList: true,
+							//characterData: true,
+							//subtree: true || null,
+							attributeOldValue: true || null,
+							//characterDataOldValue: true || null,
+						});
+					});
+				}
 			},
 
 			// 너비 및 보이는 개수 설정
@@ -412,6 +465,12 @@
 
 				//console.log("data-swiper=" + $(this.targetName).attr("data-swiper") + " ::", "max =", this.maxItem, "/ sizeBundle=", this.sizeBundle, " / sizeMaxMoment", this.sizeMaxMoment);
  				$(this.swiperSlide).eq((this.addItem + this.moveLv * this.bundle)).addClass("on");
+			},
+
+			// 세팅 관련 function 묶음 실행
+			fnInitSetting : function() {
+				this.fnSizeSet();
+				this.fnSettings();
 			},
 
 			// 대상의 처음과 끝 객체 복사
@@ -555,91 +614,101 @@
 				}
 
 				$(this.navi.prev).off(this.evtTypeStart).on(this.evtTypeStart, this, function(e){
-					obj.moveLv--;
-					if( obj.loop ){
-						if( obj.moveLv < 0 ){
-							obj.moveLv = obj.maxPage - 1;
-							if(obj.vertical){
-								if( obj.etcItem == 0 ){
-									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
-								}else{
-									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
-								}
-							}else{
-								if( obj.etcItem == 0 ){
-									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
-								}else{
-									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
-								}
-							}
-
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
-						}
-					}else{
-						if( obj.moveLv < 0 ){
-							obj.moveLv = 0;
-						}
-					}
-
-					// 인디케이터 on 표시
-					if( obj.indicator ){
-						obj.fnIndicatorOn();
-					}
-
-					// 페이지 넘버 표시
-					if( obj.page ){
-						obj.fnPageCount();
-					}
-					obj.fnMoveGo();
+					obj.fnPrevMove(obj);
 
 					e.stopPropagation();
 				});
 
 				$(this.navi.next).off(this.evtTypeStart).on(this.evtTypeStart, this, function(e){
-					obj.moveLv++;
-					if( obj.loop ){
-						if( obj.moveLv > obj.maxPage - 1 ){
-							obj.moveLv = 0;
-							if(obj.vertical){
-								if( obj.etcItem == 0 ){
-									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
-								}else{
-									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
-								}
-							}else{
-								if( obj.etcItem == 0 ){
-									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
-								}else{
-									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
-								}
-							}
-
-							$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
-						}
-					}else{
-						if( obj.autoplay ){
-							if( obj.moveLv > obj.maxPage - 1 ){
-								obj.moveLv = 0;
-							}
-						}else{
-							if( obj.moveLv > obj.maxPage - 1 ){
-								obj.moveLv = obj.maxPage - 1;
-							}
-						}
-					}
-					// 인디케이터 on 표시
-					if( obj.indicator ){
-						obj.fnIndicatorOn();
-					}
-
-					// 페이지 넘버 표시
-					if( obj.page ){
-						obj.fnPageCount();
-					}
-					obj.fnMoveGo();
+					obj.fnNextMove(obj);
 
 					e.stopPropagation();
 				});
+			},
+
+			// 좌측 이동 
+			fnPrevMove : function(obj) {
+				obj.moveLv--;
+				if( obj.loop ){
+					if( obj.moveLv < 0 ){
+						obj.moveLv = obj.maxPage - 1;
+						if(obj.vertical){
+							if( obj.etcItem == 0 ){
+								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+							}else{
+								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+							}
+						}else{
+							if( obj.etcItem == 0 ){
+								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+							}else{
+								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+							}
+						}
+
+						$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
+					}
+				}else{
+					if( obj.moveLv < 0 ){
+						obj.moveLv = 0;
+					}
+				}
+
+				// 인디케이터 on 표시
+				if( obj.indicator ){
+					obj.fnIndicatorOn();
+				}
+
+				// 페이지 넘버 표시
+				if( obj.page ){
+					obj.fnPageCount();
+				}
+				obj.fnMoveGo();
+			},
+
+			// 우측 이동
+			fnNextMove : function(obj) {
+				obj.moveLv++;
+				if( obj.loop ){
+					if( obj.moveLv > obj.maxPage - 1 ){
+						obj.moveLv = 0;
+						if(obj.vertical){
+							if( obj.etcItem == 0 ){
+								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+							}else{
+								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+							}
+						}else{
+							if( obj.etcItem == 0 ){
+								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+							}else{
+								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+							}
+						}
+
+						$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
+					}
+				}else{
+					if( obj.autoplay ){
+						if( obj.moveLv > obj.maxPage - 1 ){
+							obj.moveLv = 0;
+						}
+					}else{
+						if( obj.moveLv > obj.maxPage - 1 ){
+							obj.moveLv = obj.maxPage - 1;
+						}
+					}
+				}
+				// 인디케이터 on 표시
+				if( obj.indicator ){
+					obj.fnIndicatorOn();
+				}
+
+				// 페이지 넘버 표시
+				if( obj.page ){
+					obj.fnPageCount();
+				}
+				obj.fnMoveGo();
 			},
 
 			// 대상 터치 TouchStart
@@ -916,9 +985,10 @@
 					});
 				}else{
 					this.swipeAction = false;
-					clearTimeout(this.autoSetTime);
 					$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
-					$(this.together_box).off("transitionend webkitTransitionEnd");
+					if( this.autoplay ){
+						this.fnAutoPlay();
+					}
 				}
 			},
 
@@ -943,7 +1013,13 @@
 				clearTimeout(this.autoSetTime);
 				$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 				this.autoSetTime = setTimeout(function() {
-					$(obj.navi.next).trigger(obj.evtTypeStart);
+					// $(obj.navi.next).trigger(obj.evtTypeStart);
+					// 네비 버튼이 없어도 자동이동이 필요할 수 있어서 fnNextMove 호출
+					if( $(obj.swiperBox).is(":visible") ){
+						obj.fnNextMove(obj);
+					}else{
+						obj.fnAutoPlay();
+					}
 				},this.autoplay.delay);
 			},
 
@@ -1091,8 +1167,7 @@
 				var obj = e.data;
 				if( obj.sizeCached != $(window).width() ){
 					obj.sizeCached = $(window).width();
-					obj.fnSizeSet();
-					obj.fnSettings();
+					obj.fnInitSetting();
 				}
 			},
 		}
@@ -1189,569 +1264,602 @@
 
 <body>
 	<div class="wrap">
-		<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:false, simulateTouch:false</span>, spaceBetween:50)</strong>
-		<div class="swiper_area" data-swiper=1>
-			<ul class="swiper_box">
-				<li><a href="#none">111111111111</a></li>
-				<li><a href="#none">222222222222</a></li>
-				<li><a href="#none">333333333333</a></li>
-				<li><a href="#none">444444444444</a></li>
-			</ul>
-			<!-- <button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button> -->
+		<div style="display:none;">
+			<div style="display:none;">
+				<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:false, simulateTouch:false</span>, spaceBetween:50)</strong>
+				<div class="swiper_area" data-swiper=1 style="display:none;">
+					<ul class="swiper_box">
+						<li><a href="#none">111111111111</a></li>
+						<li><a href="#none">222222222222</a></li>
+						<li><a href="#none">333333333333</a></li>
+						<li><a href="#none">444444444444</a></li>
+					</ul>
+					<!-- <button type="button" class="btn_prev">이전</button>
+					<button type="button" class="btn_next">다음</button> -->
+				</div>
+				<script type="text/javascript">
+					var swiper1 = new swiper({
+						targetName: $("[data-swiper=1]"),				// 스와이프 대상
+						swiperSlide: $("[data-swiper=1] > ul > li"),	// 스와이프 슬라이드 대상 지정
+						//loop: true,										// 무한 설정
+						//speed: 600,										// 스와이프 속도
+						//bundle: 3,										// 보여질 그룹
+						spaceBetween: 50,								// 간격 설정
+						//alignCenter: true,								// item 센터 정렬
+						indicator: true,								// 인디케이터 표시
+						page: true,										// 페이징 넘버 표시
+						//vertical: true,									// 수직 설정
+						simulateTouch: false,							// 터치 기능 설정
+						navi: {											// 네비(좌,우) 버튼 설정
+						// 	prev: $("[data-swiper=1] .btn_prev"),
+						// 	next: $("[data-swiper=1] .btn_next"),
+						},
+						//autoplay: {										// auto play 설정
+						//	delay: 2500,
+						//},
+						on: {
+							initAfter: function() {
+								console.log("initAfter");
+							},
+							slideChangeStart: function() {
+								console.log("slideChangeStart");
+							},
+							slideChangeEnd: function() {
+								console.log("slideChangeEnd");
+							},
+						},
+					});
+				</script>
+			</div>
 		</div>
-		<script type="text/javascript">
-			var swiper1 = new swiper({
-				targetName: $("[data-swiper=1]"),				// 스와이프 대상
-				swiperSlide: $("[data-swiper=1] > ul > li"),	// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				//speed: 600,										// 스와이프 속도
-				//bundle: 3,										// 보여질 그룹
-				spaceBetween: 50,								// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				simulateTouch: false,							// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-				// 	prev: $("[data-swiper=1] .btn_prev"),
-				// 	next: $("[data-swiper=1] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-				on: {
-					initAfter: function() {
-						console.log("initAfter");
+
+		<div style="display:none;">
+			<strong><b>[swiper=2]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
+			<div class="swiper_area t3" data-swiper=2>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper2 = new swiper({
+					targetName: $("[data-swiper=2]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=2] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					//loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 2,										// 보여질 그룹
+					spaceBetween: 25,								// 간격 설정
+					alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=2] .btn_prev"),
+						next: $("[data-swiper=2] .btn_next"),
 					},
-					slideChangeStart: function() {
-						console.log("slideChangeStart");
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
+		</div>
+
+		<div>
+			<strong><b>[swiper=3]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
+			<div class="swiper_area t3" data-swiper=3>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper3 = new swiper({
+					targetName: $("[data-swiper=3]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=3] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					//loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					bundle: 2,										// 보여질 그룹
+					spaceBetween: 25,								// 간격 설정
+					alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=3] .btn_prev"),
+						next: $("[data-swiper=3] .btn_next"),
 					},
-					slideChangeEnd: function() {
-						console.log("slideChangeEnd");
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
+		</div>
+
+		<div>
+			<strong><b>[swiper=4]</b> preview:2 / (Bundle:2, Item:6, <span>Loop:false</span>, AutoPlay:true)</strong>
+			<div class="swiper_area t1" data-swiper=4>
+				<ul class="swiper_box">
+					<li><a href="#none">1111111111111</a></li>
+					<li><a href="#none">2222222222222</a></li>
+					<li><a href="#none">3333333333333</a></li>
+					<li><a href="#none">4444444444444</a></li>
+					<li><a href="#none">5555555555555</a></li>
+					<li><a href="#none">6666666666666</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper4 = new swiper({
+					targetName: $("[data-swiper=4]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=4] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					//loop: true,										// 무한 설정
+					//speed: 600,										// 스와이프 속도
+					bundle: 2,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=4] .btn_prev"),
+						next: $("[data-swiper=4] .btn_next"),
 					},
-				},
-			});
-		</script>
-
-		<strong><b>[swiper=2]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
-		<div class="swiper_area t3" data-swiper=2>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+					autoplay: {										// auto play 설정
+						delay: 2500,
+					},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper2 = new swiper({
-				targetName: $("[data-swiper=2]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=2] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 2,										// 보여질 그룹
-				spaceBetween: 25,								// 간격 설정
-				alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=2] .btn_prev"),
-					next: $("[data-swiper=2] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=3]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
-		<div class="swiper_area t3" data-swiper=3>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=5]</b> preview:4 / (Bundle:3, Item:11, <span>Loop:false</span>)</strong>
+			<div class="swiper_area t3" data-swiper=5>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li class="video">
+						<div id="playerA" data-src="kTlv5_Bs8aw"></div>
+					</li>
+					<li class="video">
+						<div id="playerB" data-src="2S24-y0Ij3Y"></div>
+					</li>
+					<li class="video">
+						<video id="vi" controls playsinline>
+							<source src="test.mp4">
+						</video>
+					</li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+					<li><a href="#none">11,11,11,11</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper5 = new swiper({
+					targetName: $("[data-swiper=5]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=5] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					//loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=5] .btn_prev"),
+						next: $("[data-swiper=5] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper3 = new swiper({
-				targetName: $("[data-swiper=3]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=3] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				bundle: 2,										// 보여질 그룹
-				spaceBetween: 25,								// 간격 설정
-				alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=3] .btn_prev"),
-					next: $("[data-swiper=3] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
-
-		<strong><b>[swiper=4]</b> preview:2 / (Bundle:2, Item:6, <span>Loop:false</span>, AutoPlay:true)</strong>
-		<div class="swiper_area t1" data-swiper=4>
-			<ul class="swiper_box">
-				<li><a href="#none">1111111111111</a></li>
-				<li><a href="#none">2222222222222</a></li>
-				<li><a href="#none">3333333333333</a></li>
-				<li><a href="#none">4444444444444</a></li>
-				<li><a href="#none">5555555555555</a></li>
-				<li><a href="#none">6666666666666</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
-		</div>
-		<script type="text/javascript">
-			var swiper4 = new swiper({
-				targetName: $("[data-swiper=4]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=4] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				//speed: 600,										// 스와이프 속도
-				bundle: 2,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=4] .btn_prev"),
-					next: $("[data-swiper=4] .btn_next"),
-				},
-				autoplay: {										// auto play 설정
-					delay: 2500,
-				},
-			});
-		</script>
-
-		<strong><b>[swiper=5]</b> preview:4 / (Bundle:3, Item:11, <span>Loop:false</span>)</strong>
-		<div class="swiper_area t3" data-swiper=5>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li class="video">
-					<div id="playerA" data-src="kTlv5_Bs8aw"></div>
-				</li>
-				<li class="video">
-					<div id="playerB" data-src="2S24-y0Ij3Y"></div>
-				</li>
-				<li class="video">
-					<video id="vi" controls playsinline>
-						<source src="test.mp4">
-					</video>
-				</li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-				<li><a href="#none">11,11,11,11</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
-		</div>
-		<script type="text/javascript">
-			var swiper5 = new swiper({
-				targetName: $("[data-swiper=5]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=5] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=5] .btn_prev"),
-					next: $("[data-swiper=5] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
 
 		<hr />
 		<hr />
 
-		<strong><b>[swiper=6]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:true</span>)</strong>
-		<div class="swiper_area" data-swiper=6>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div style="display:none;">
+			<strong><b>[swiper=6]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:true</span>)</strong>
+			<div class="swiper_area" data-swiper=6>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper6 = new swiper({
+					targetName: $("[data-swiper=6]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=6] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					//speed: 600,										// 스와이프 속도
+					//bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=6] .btn_prev"),
+						next: $("[data-swiper=6] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper6 = new swiper({
-				targetName: $("[data-swiper=6]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=6] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				//speed: 600,										// 스와이프 속도
-				//bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=6] .btn_prev"),
-					next: $("[data-swiper=6] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=7]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:true</span>)</strong>
-		<div class="swiper_area t3" data-swiper=7>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li class="video">
-					<div id="playerC" data-src="kTlv5_Bs8aw"></div>
-				</li>
-				<li class="video">
-					<div id="playerD" data-src="2S24-y0Ij3Y"></div>
-				</li>
-				<li class="video">
-					<video id="vid" controls playsinline>
-						<source src="test.mp4">
-					</video>
-				</li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=7]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:true</span>)</strong>
+			<div class="swiper_area t3" data-swiper=7>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li class="video">
+						<div id="playerC" data-src="kTlv5_Bs8aw"></div>
+					</li>
+					<li class="video">
+						<div id="playerD" data-src="2S24-y0Ij3Y"></div>
+					</li>
+					<li class="video">
+						<video id="vid" controls playsinline>
+							<source src="test.mp4">
+						</video>
+					</li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper7 = new swiper({
+					targetName: $("[data-swiper=7]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=7] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=7] .btn_prev"),
+						next: $("[data-swiper=7] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper7 = new swiper({
-				targetName: $("[data-swiper=7]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=7] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=7] .btn_prev"),
-					next: $("[data-swiper=7] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=8]</b> preview:3 / (Bundle:1, Item:6, <span>Loop:true</span>, alignCenter:true)</strong>
-		<div class="swiper_area t2" data-swiper=8>
-			<ul class="swiper_box">
-				<li><a href="#none">111111111111111</a></li>
-				<li><a href="#none">222222222222222</a></li>
-				<li><a href="#none">333333333333333</a></li>
-				<li><a href="#none">444444444444444</a></li>
-				<li><a href="#none">555555555555555</a></li>
-				<li><a href="#none">666666666666666</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=8]</b> preview:3 / (Bundle:1, Item:6, <span>Loop:true</span>, alignCenter:true)</strong>
+			<div class="swiper_area t2" data-swiper=8>
+				<ul class="swiper_box">
+					<li><a href="#none">111111111111111</a></li>
+					<li><a href="#none">222222222222222</a></li>
+					<li><a href="#none">333333333333333</a></li>
+					<li><a href="#none">444444444444444</a></li>
+					<li><a href="#none">555555555555555</a></li>
+					<li><a href="#none">666666666666666</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper8 = new swiper({
+					targetName: $("[data-swiper=8]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=8] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=8] .btn_prev"),
+						next: $("[data-swiper=8] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper8 = new swiper({
-				targetName: $("[data-swiper=8]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=8] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=8] .btn_prev"),
-					next: $("[data-swiper=8] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 2500,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=9]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:true</span>, spaceBetween:50, alignCenter:true)</strong>
-		<div class="swiper_area t3" data-swiper=9 id="a">
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=9]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:true</span>, spaceBetween:50, alignCenter:true)</strong>
+			<div class="swiper_area t3" data-swiper=9 id="a">
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper9 = new swiper({
+					targetName: $("[data-swiper=9]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=9] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					bundle: 2,										// 보여질 그룹
+					spaceBetween: 50,								// 간격 설정
+					alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=9] .btn_prev"),
+						next: $("[data-swiper=9] .btn_next"),
+					},
+					// autoplay: {										// auto play 설정
+					// 	delay: 3000,
+					// },
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper9 = new swiper({
-				targetName: $("[data-swiper=9]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=9] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				bundle: 2,										// 보여질 그룹
-				spaceBetween: 50,								// 간격 설정
-				alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=9] .btn_prev"),
-					next: $("[data-swiper=9] .btn_next"),
-				},
-				// autoplay: {										// auto play 설정
-				// 	delay: 3000,
-				// },
-			});
-		</script>
 
-		<strong><b>[swiper=10]</b> preview:4 / (Bundle:3, Item:10, <span>Loop:true</span>, AutoPlay:true)</strong>
-		<div class="swiper_area t3" data-swiper=10>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=10]</b> preview:4 / (Bundle:3, Item:10, <span>Loop:true</span>, AutoPlay:true)</strong>
+			<div class="swiper_area t3" data-swiper=10>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper10 = new swiper({
+					targetName: $("[data-swiper=10]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=10] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=10] .btn_prev"),
+						next: $("[data-swiper=10] .btn_next"),
+					},
+					autoplay: {										// auto play 설정
+						delay: 3000,
+					},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper10 = new swiper({
-				targetName: $("[data-swiper=10]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=10] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=10] .btn_prev"),
-					next: $("[data-swiper=10] .btn_next"),
-				},
-				autoplay: {										// auto play 설정
-					delay: 3000,
-				},
-			});
-		</script>
 
-		<strong><b>[swiper=11]</b> preview:5 / (Bundle:1, Item:1, <span>Loop:true</span>)</strong>
-		<div class="swiper_area t4" data-swiper=11>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=11]</b> preview:5 / (Bundle:1, Item:1, <span>Loop:true</span>)</strong>
+			<div class="swiper_area t4" data-swiper=11>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper11 = new swiper({
+					targetName: $("[data-swiper=11]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=11] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 3,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=11] .btn_prev"),
+						next: $("[data-swiper=11] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 3000,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper11 = new swiper({
-				targetName: $("[data-swiper=11]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=11] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 3,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=11] .btn_prev"),
-					next: $("[data-swiper=11] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 3000,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=12]</b> preview:5 / (Bundle:5, Item:10, <span>Loop:true</span>)</strong>
-		<div class="swiper_area t4" data-swiper=12>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=12]</b> preview:5 / (Bundle:5, Item:10, <span>Loop:true</span>)</strong>
+			<div class="swiper_area t4" data-swiper=12>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper12 = new swiper({
+					targetName: $("[data-swiper=12]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=12] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					bundle: 5,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=12] .btn_prev"),
+						next: $("[data-swiper=12] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 3000,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper12 = new swiper({
-				targetName: $("[data-swiper=12]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=12] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				bundle: 5,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				//vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=12] .btn_prev"),
-					next: $("[data-swiper=12] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 3000,
-				//},
-			});
-		</script>
 
 		<hr />
+		<hr />
 
-		<strong><b>[swiper=13]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true</span>)</strong>
-		<div class="swiper_area v1" data-swiper=13>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=13]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true</span>)</strong>
+			<div class="swiper_area v1" data-swiper=13>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper13 = new swiper({
+					targetName: $("[data-swiper=13]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=13] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					//loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 5,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=13] .btn_prev"),
+						next: $("[data-swiper=13] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 3000,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper13 = new swiper({
-				targetName: $("[data-swiper=13]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=13] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				//loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 5,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=13] .btn_prev"),
-					next: $("[data-swiper=13] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 3000,
-				//},
-			});
-		</script>
 
-		<strong><b>[swiper=14]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true, Loop:true</span>)</strong>
-		<div class="swiper_area v1" data-swiper=14>
-			<ul class="swiper_box">
-				<li><a href="#none">11111111111</a></li>
-				<li><a href="#none">22222222222</a></li>
-				<li><a href="#none">33333333333</a></li>
-				<li><a href="#none">44444444444</a></li>
-				<li><a href="#none">55555555555</a></li>
-				<li><a href="#none">66666666666</a></li>
-				<li><a href="#none">77777777777</a></li>
-				<li><a href="#none">88888888888</a></li>
-				<li><a href="#none">99999999999</a></li>
-				<li><a href="#none">10,10,10,10</a></li>
-			</ul>
-			<button type="button" class="btn_prev">이전</button>
-			<button type="button" class="btn_next">다음</button>
+		<div>
+			<strong><b>[swiper=14]</b> preview:1 / (Bundle:1, Item:10, <span>vertical:true, Loop:true</span>)</strong>
+			<div class="swiper_area v1" data-swiper=14>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+					<li><a href="#none">22222222222</a></li>
+					<li><a href="#none">33333333333</a></li>
+					<li><a href="#none">44444444444</a></li>
+					<li><a href="#none">55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+					<li><a href="#none">99999999999</a></li>
+					<li><a href="#none">10,10,10,10</a></li>
+				</ul>
+				<button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button>
+			</div>
+			<script type="text/javascript">
+				var swiper14 = new swiper({
+					targetName: $("[data-swiper=14]"),				// 스와이프 대상
+					//swiperSlide: $("[data-swiper=14] > ul > li"),		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 600,										// 스와이프 속도
+					//bundle: 5,										// 보여질 그룹
+					//spaceBetween: 50,									// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						prev: $("[data-swiper=14] .btn_prev"),
+						next: $("[data-swiper=14] .btn_next"),
+					},
+					//autoplay: {										// auto play 설정
+					//	delay: 3000,
+					//},
+				});
+			</script>
 		</div>
-		<script type="text/javascript">
-			var swiper14 = new swiper({
-				targetName: $("[data-swiper=14]"),				// 스와이프 대상
-				//swiperSlide: $("[data-swiper=14] > ul > li"),		// 스와이프 슬라이드 대상 지정
-				loop: true,										// 무한 설정
-				speed: 600,										// 스와이프 속도
-				//bundle: 5,										// 보여질 그룹
-				//spaceBetween: 50,									// 간격 설정
-				//alignCenter: true,								// item 센터 정렬
-				indicator: true,								// 인디케이터 표시
-				page: true,										// 페이징 넘버 표시
-				vertical: true,									// 수직 설정
-				//simulateTouch: false,								// 터치 기능 설정
-				navi: {											// 네비(좌,우) 버튼 설정
-					prev: $("[data-swiper=14] .btn_prev"),
-					next: $("[data-swiper=14] .btn_next"),
-				},
-				//autoplay: {										// auto play 설정
-				//	delay: 3000,
-				//},
-			});
-		</script>
+
+
 		<div id="v"></div>
 		<div id="v"></div>
 		<div id="v"></div>
