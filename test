@@ -97,6 +97,7 @@
 
 		/* #########################################################
 			=== swiper ver.2.3 ===
+			ㄴ2021-03-04 : 사용자 추가이벤트에서 this 사용 가능하게 수정 (this 를 이용한 변수 접근 가능)
 			ㄴ2021-03-03 : autoplay 기능 숨겨진 요소는 안움직이게 수정
 			ㄴ2021-03-02 : DOM 요소 변화 감지(MutationObserver) 기능 추가 > IE11 부터 지원
 
@@ -126,11 +127,13 @@
 			// freeMode (짝수 안맞을 때, page 기능 사용 못함)
 			// 버튼 클릭으로 item 추가 기능 (앞, 뒤 선택)
 			// 버튼 연속 클릭에 텀을 주는 설정
+			// 유저가 사용 할 값을 변수에 할당
 
 			// 복제 된 video 요소 playTime 동기화 기능 (보류)
 			// twins(함께 움직이는 요소) 추가 (보류)
 		#########################################################*/
 		function swiper( args ){
+			var obj = this;
 			// 이벤트 구분을 위한 값
 			this.countSwiper = args.targetName.attr("data-swiper");
 
@@ -188,19 +191,28 @@
 			this.indicator = args.indicator || false;								// 인디케이터 설정
 			this.autoplay = args.autoplay;											// 자동롤링 설정
 			this.controlGroup = args.controlGroup || false;							// 유틸(페이징,인디케이터) 그룹 설정
-			this.speed = args.speed || 400;											// swiper 이동 속도
+			this.speed = args.speed || 1000;										// swiper 이동 속도
 			this.spaceBetween = args.spaceBetween || 0;								// item 간격 설정
 			this.alignCenter = args.alignCenter || false;							// item 센터 기준으로 정렬
 			this.vertical = args.vertical || false;									// swiper 방향 설정 horizontal or vertical
 			this.simulateTouch = (args.simulateTouch != false ? true : false);		// 터치 기능 설정
-			this.on = args.on || {													// 사용자 추가 이벤트 설정
-				initAfter: function() {}, 											// init() 후 실행
-				slideChangeStart: function() {}, 									// slide change 전 실행
-				slideChangeEnd: function() {},										// slide change 후 실행
-			};
 
-			//this._autoSwipe = args.autoPlay > 0 ? true : false;
-			//this.equal_move = args.equal_move || false;					// 균일한 움직임 설정
+			// 사용자 추가 이벤트 설정
+			this.initAfter = this.slideChangeStart = this.slideChangeEnd = function() {};
+			if( args.on ){
+				// init() 후 실행
+				if(args.on.initAfter != "undefined"){
+					this.initAfter = args.on.initAfter;
+				}
+				// slide change 전 실행
+				if(args.on.slideChangeStart != "undefined"){
+					this.slideChangeStart = args.on.slideChangeStart;
+				}
+				// slide change 후 실행
+				if(args.on.slideChangeEnd != "undefined"){
+					this.slideChangeEnd = args.on.slideChangeEnd;
+				}
+			}
 
 			this.autoSetTime;											// 자동 롤링 저장 변수.
 			this.preview;												// 보이는 개수
@@ -334,7 +346,7 @@
 					this.fnObserve();
 				}
 
-				this.on.initAfter();
+				this.initAfter();
 			},
 
 			// 대상이 보이는지, 감춰진 상태인지 체크
@@ -941,9 +953,9 @@
 			// 지정된 위치로 이동 모션
 			fnMoveGo : function() {
 				var obj = this;
-				if(obj.moveLvPrev != obj.moveLv){
+				if(this.moveLvPrev != this.moveLv){
 					// 슬라이드 변경 전 실행
-					obj.on.slideChangeStart();
+					this.slideChangeStart();
 				}
 
 				// 자동롤링에 의해 호출 되었을때 대상이 보일때와 안보일때 분기 처리.
@@ -979,7 +991,7 @@
 
 						if(obj.moveLvPrev != obj.moveLv){
 							// 슬라이드 변경 후 실행
-							obj.on.slideChangeEnd();
+							obj.slideChangeEnd();
 							obj.moveLvPrev = obj.moveLv;
 						}
 					});
@@ -1178,6 +1190,7 @@
 			},
 		}
 
+
 		// global 함수 만들기
 		// $(document).ready(function(){
 		// 	window.api = function() {
@@ -1305,7 +1318,7 @@
 						//},
 						on: {
 							initAfter: function() {
-								console.log("initAfter");
+								console.log("initAfter", this);
 							},
 							slideChangeStart: function() {
 								console.log("slideChangeStart");
@@ -1342,7 +1355,7 @@
 					targetName: $("[data-swiper=2]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=2] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					//loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					speed: 1500,									// 스와이프 속도
 					//bundle: 2,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
 					alignCenter: true,								// item 센터 정렬
@@ -1376,15 +1389,15 @@
 					<li><a href="#none">99999999999</a></li>
 					<li><a href="#none">10,10,10,10</a></li>
 				</ul>
-				<button type="button" class="btn_prev">이전</button>
-				<button type="button" class="btn_next">다음</button>
+				<!-- <button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button> -->
 			</div>
 			<script type="text/javascript">
 				var swiper3 = new swiper({
 					targetName: $("[data-swiper=3]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=3] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					//loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					bundle: 2,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
 					alignCenter: true,								// item 센터 정렬
@@ -1392,13 +1405,24 @@
 					page: true,										// 페이징 넘버 표시
 					//vertical: true,									// 수직 설정
 					//simulateTouch: false,								// 터치 기능 설정
-					navi: {											// 네비(좌,우) 버튼 설정
-						prev: $("[data-swiper=3] .btn_prev"),
-						next: $("[data-swiper=3] .btn_next"),
-					},
+					// navi: {											// 네비(좌,우) 버튼 설정
+					// 	prev: $("[data-swiper=3] .btn_prev"),
+					// 	next: $("[data-swiper=3] .btn_next"),
+					// },
 					//autoplay: {										// auto play 설정
 					//	delay: 2500,
 					//},
+					on: {
+						initAfter: function() {
+							console.log("initAfter-", this.targetName[0], this.maxItem, this.realItem);
+						},
+						slideChangeStart: function() {
+							console.log("slideChangeStart-");
+						},
+						slideChangeEnd: function() {
+							console.log("slideChangeEnd-");
+						},
+					},
 				});
 			</script>
 		</div>
@@ -1473,7 +1497,7 @@
 					targetName: $("[data-swiper=5]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=5] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					//loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					//alignCenter: true,								// item 센터 정렬
@@ -1562,7 +1586,7 @@
 					targetName: $("[data-swiper=7]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=7] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					//bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					//alignCenter: true,								// item 센터 정렬
@@ -1600,7 +1624,7 @@
 					targetName: $("[data-swiper=8]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=8] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					//bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					alignCenter: true,								// item 센터 정렬
@@ -1642,7 +1666,7 @@
 					targetName: $("[data-swiper=9]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=9] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					bundle: 2,										// 보여질 그룹
 					spaceBetween: 50,								// 간격 설정
 					alignCenter: true,								// item 센터 정렬
@@ -1684,7 +1708,7 @@
 					targetName: $("[data-swiper=10]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=10] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					//alignCenter: true,								// item 센터 정렬
@@ -1717,7 +1741,7 @@
 					targetName: $("[data-swiper=11]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=11] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					//bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					//alignCenter: true,								// item 센터 정렬
@@ -1759,7 +1783,7 @@
 					targetName: $("[data-swiper=12]"),				// 스와이프 대상
 					//swiperSlide: $("[data-swiper=12] > ul > li"),		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
-					speed: 600,										// 스와이프 속도
+					//speed: 600,										// 스와이프 속도
 					bundle: 5,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
 					//alignCenter: true,								// item 센터 정렬
