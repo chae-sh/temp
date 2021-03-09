@@ -96,6 +96,9 @@
 		}
 
 		/* #########################################################
+			=== swiper ver.2.4 ===
+			ㄴ2021-03-05 : swiper 동기화 기능 추가 (부모:thumnb, 자식:swiperTwin)
+
 			=== swiper ver.2.3 ===
 			ㄴ2021-03-05 : fnNextMove > click 과 호출시 분기 처리 추가, resize 시 autoPlay 안되는 버그 수정
 			ㄴ2021-03-05 : slideTo 기능 추가, indicator click 이동에 slideTo 적용
@@ -129,10 +132,8 @@
 			// freeMode (짝수 안맞을 때, page 기능 사용 못함)
 			// 버튼 클릭으로 item 추가 기능 (앞, 뒤 선택)
 			// 버튼 연속 클릭에 텀을 주는 설정
-			// 유저가 사용 할 값을 변수에 할당
 
 			// 복제 된 video 요소 playTime 동기화 기능 (보류)
-			// twins(함께 움직이는 요소) 추가 (보류)
 		#########################################################*/
 		function swiper( args ){
 			var obj = this;
@@ -1350,7 +1351,8 @@
 						//},
 						on: {
 							initAfter: function() {
-								console.log("initAfter", this);
+								console.log("initAfter");
+								//console.log("initAfter", this);
 							},
 							slideChangeStart: function() {
 								console.log("slideChangeStart");
