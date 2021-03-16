@@ -2008,6 +2008,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2315,8 +2316,8 @@
 			// 전체 바를 기준으로 min, max 위치값 저장.
 			getMinMax : function(e) {
 				this.btnWidth = $(".btn_max", this.targetName)[0].getBoundingClientRect().width;
-				this.offsetMin = $(this.targetName).offset().left + this.btnWidth / 2;
-				this.offsetMax = $(this.targetName).offset().left + $(this.targetName).outerWidth() - this.btnWidth / 2;
+				this.offsetMin = $(this.dragArea).offset().left;
+				this.offsetMax = $(this.dragArea).offset().left + $(this.dragArea).outerWidth();
 
 				$(this.dragArea).css({"left" : this.btnWidth/2 + "px", "right" : this.btnWidth/2 + "px"});
 
@@ -2427,7 +2428,6 @@
 					}else{
 						idx = Math.round(this.percent / (this.percentUnit * this.step));
 					}
-					
 				}
 
 				this.goIdx = idx;
