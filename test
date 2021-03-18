@@ -2010,6 +2010,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2175,6 +2176,8 @@
 			this.valueType = $.type(this.valueArray[0]);								// 배열이 문자열인가? 숫자인가?
 			this.offsetMin;																// 최소 버튼의 offset 위치
 			this.offsetMax;																// 최대 버튼의 offset 위치
+			this._observe = true;														// 대상이 보이는지, 감춰진 상태인지 체크
+			this.rect = $(this.targetName)[0].getBoundingClientRect();					// 대상의 너비, 위치 등 상세값 반환
 
 			// value 최소, 최대, 초기위치 세팅
 			if( this.valueType == "string" ){
@@ -2265,6 +2268,52 @@
 					.off(this.evtTypeMove).off(this.evtTypeEnd)
 					.on(this.evtTypeMove, this, function(e){obj.sliderMove(e)})
 					.on(this.evtTypeEnd, this, function(e){obj.sliderUp(e)});
+
+				// 대상이 보이는 상태인지, 감춰진 상태인지 체크
+				if(window.MutationObserver){
+					this.fnObserve();
+				}
+			},
+
+			// 대상이 보이는지, 감춰진 상태인지 체크
+			fnObserve : function() {
+				var obj = this;
+
+				if(this.rect.width == 0 && this.rect.height == 0){
+					this._observe = false;
+
+					var dom = new MutationObserver(DOMcallback);
+					function DOMcallback(e){
+						console.log(e, e[0].target, e[0].type, $(e[0].target).is(":hidden"), obj._observe);
+						if(!$(obj.targetName).is(":hidden") && e[0].type == "attributes" && !obj._observe){
+							//console.log("observe");
+							obj.getMinMax();
+							obj._observe = true;
+						}else if($(obj.targetName).is(":hidden") && e[0].type == "attributes" && obj._observe){
+							obj._observe = false;
+						}
+					}
+
+					dom.observe($(this.targetName)[0], {
+						attributes: true,
+						childList: false,
+						//characterData: true,
+						//subtree: true || null,
+						attributeOldValue: true || null,
+						//characterDataOldValue: true || null,
+					});
+
+					$(this.targetName).parents(':hidden').each(function(){
+						dom.observe($(this)[0], {
+							attributes: true,
+							//childList: true,
+							//characterData: true,
+							//subtree: true || null,
+							attributeOldValue: true || null,
+							//characterDataOldValue: true || null,
+						});
+					});
+				}
 			},
 
 			// 마우스 down
@@ -2275,7 +2324,7 @@
 					return false;
 				}
 
-				obj.getMinMax();
+				//obj.getMinMax();			// 매번 세팅값을 다시 구하면 display:none에 대응이 수월하지만, 불필요한 작업
 
 				obj.targetEvt = true;
 				obj.getPercent(e);
@@ -2317,11 +2366,12 @@
 			getMinMax : function(e) {
 				// 버튼 크기, 최소 좌표값, 최대 좌표값 설정
 				this.btnWidth = $(".btn_max", this.targetName)[0].getBoundingClientRect().width;
-				this.offsetMin = $(this.dragArea).offset().left;
-				this.offsetMax = $(this.dragArea).offset().left + $(this.dragArea).outerWidth();
-
 				// 드래그 영역 설정
 				$(this.dragArea).css({"left" : this.btnWidth/2 + "px", "right" : this.btnWidth/2 + "px"});
+
+				this.offsetMin = $(this.dragArea).offset().left;
+				this.offsetMax = $(this.dragArea).offset().left + $(this.dragArea).outerWidth();
+				//console.log(this.targetName, this.btnWidth, this.offsetMin, this.offsetMax, $(this.dragArea).outerWidth());
 
 				// 1개당 몇%를 가지는지 설정
 				if( this.valueType == "string" ){
@@ -2490,7 +2540,7 @@
 </head>
 <body>
 	<div class="wrap">
-		<div class="drag_slider1" data-drag="drag1">
+		<div class="drag_slider1" data-drag="drag1" style="display:none;">
 			<div class="area">
 				<button type="button" class="btn_min"><em>최소</em></button>
 				<div class="bar"></div>
