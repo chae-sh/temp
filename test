@@ -69,6 +69,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -115,7 +116,6 @@ https://unpkg.com/browse/swiper@6.4.5/
 		.wrap .swiper_area ~ hr + hr {margin-top:8px;}
 		.swiper_area {position:relative;background-color:#999;overflow:hidden;}
 		.swiper_area .swiper_box {width:100%;height:200px;display:flex;flex-wrap:nowrap;}
-		.swiper_area .swiper_box.t1 {height:auto;align-items:flex-start;}
 		.swiper_area .swiper_box > li {position:relative;width:100%;border:1px solid red;background-color:#ccc;flex:1 0 auto;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:0 0 auto;}
 		.swiper_area .swiper_box .video video, 
 		.swiper_area .swiper_box .video iframe {width:100%;height:100%;outline:0;}
@@ -130,6 +130,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		.swiper_area .page {position:absolute;left:0;top:10px;width:100%;height:0;font-weight:700;color:#fff;text-align:center;}
 		.swiper_area .page em {font-style:normal;}
 
+
 		.swiper_area.t1 .swiper_box > li {width:50%;}
 		.swiper_area.t2 .swiper_box > li {width:32%;margin-right:2%;}
 		.swiper_area.t3 .swiper_box > li {width:25%;}
@@ -137,6 +138,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 		.swiper_area.v1 .swiper_box {height:400px;flex-wrap:wrap;}
 		.swiper_area.v1 .swiper_box > li {height:100%;}
+
+		.swiper_area.f1 .swiper_box > li {width:auto;}
+
+		.swiper_area .swiper_box.t1 {height:auto;align-items:flex-start;}
 	</style>
 	<script>
 		// YouTube IFrame Player API
@@ -168,8 +173,11 @@ https://unpkg.com/browse/swiper@6.4.5/
 		}
 
 		/* #########################################################
+			=== swiper ver.3.0 ===
+ 			ㄴ2021-05-31 : freeMode (너비가 제각각 인 경우 : 좌표 * 각 너비 계산 방식, 기존은 레벨 * 고정너비 계산 방식)
+
 			=== swiper ver.2.5 ===
-			ㄴ2021-05-17 : autoheight 기능 추가 (슬라이드 안 높이가 제각각인 경우, on 기준으로 높이 설정, bundle 있으면 bundle 만큼 비교)
+			ㄴ2021-05-17 : autoHeight 기능 추가 (슬라이드 안 높이가 제각각인 경우, on 기준으로 높이 설정, bundle 있으면 bundle 만큼 비교)
 
 			=== swiper ver.2.4 ===
 			ㄴ2021-03-16 : event namespace 구분 추가
@@ -179,7 +187,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 			ㄴ2021-03-05 : fnNextMove > click 과 호출시 분기 처리 추가, resize 시 autoPlay 안되는 버그 수정
 			ㄴ2021-03-05 : slideTo 기능 추가, indicator click 이동에 slideTo 적용
 			ㄴ2021-03-04 : 사용자 추가이벤트에서 this 사용 가능하게 수정 (this 를 이용한 변수 접근 가능)
-			ㄴ2021-03-03 : autoplay 기능 숨겨진 요소는 안움직이게 수정
+			ㄴ2021-03-03 : autoPlay 기능 숨겨진 요소는 안움직이게 수정
 			ㄴ2021-03-02 : DOM 요소 변화 감지(MutationObserver) 기능 추가 > IE11 부터 지원
 
 			=== swiper ver.2.2 ===
@@ -197,14 +205,13 @@ https://unpkg.com/browse/swiper@6.4.5/
 			ㄴ2021-02-03 : spaceBetween 설정 기능
 			ㄴ2021-02-03 : preview 와 bundle 같으면 객체 복사를 preview 수 까지만 복사 하는 기능
 			ㄴ2021-02-02 : video 태그, youtube api 컨트롤 기능
-			ㄴ2021-02-01 : autoplay 기능
+			ㄴ2021-02-01 : autoPlay 기능
 			ㄴ2021-01-28 : bundle 기능 (아이템수 만큼 앞뒤로 복사 = 3배)
 
 			=== swiper ver.1.0 ===
 			ㄴ2020-03-02 : flex 코딩 기반, 배너 종류의 1개 단위 swiper 기능 제작
 			
 			=== 대기 작업 목록 ===
-			// freeMode (너비가 제각각 인 경우)
 			// 버튼 클릭으로 item 추가 기능 (앞, 뒤 선택)
 			// 버튼 연속 클릭에 텀을 주는 설정
 
@@ -260,24 +267,25 @@ https://unpkg.com/browse/swiper@6.4.5/
 				return target_transX;
 			}
 
-			this.targetName = args.targetName;										// swiper container
-			this.swiperBox = $(".swiper_box", this.targetName);						// swiper box
-			this.swiperSlide = args.swiperSlide || $(this.swiperBox).children();	// swiper slide child
-			this.loop = args.loop || false;											// 무한, 유한 설정
-			this.page = args.page || false;											// 페이징 설정
-			this.bundle = args.bundle || 1;											// 움직일 슬라이드 그룹 수
-			this.navi = args.navi;													// 네비(좌,우) 버튼 설정
-			this.indicator = args.indicator || false;								// 인디케이터 설정
-			this.autoplay = args.autoplay;											// 자동롤링 설정
-			this.autoheight = args.autoheight || false;								// 자동높이 설정
-			this.controlGroup = args.controlGroup || false;							// 유틸(페이징,인디케이터) 그룹 설정
-			this.speed = args.speed || 1000;										// swiper 이동 속도
-			this.spaceBetween = args.spaceBetween || 0;								// item 간격 설정
-			this.alignCenter = args.alignCenter || false;							// item 센터 기준으로 정렬
-			this.vertical = args.vertical || false;									// swiper 방향 설정 horizontal or vertical
-			this.simulateTouch = (args.simulateTouch != false ? true : false);		// 터치 기능 설정
-			this.thumbs = args.thumbs || null;										// 동기화 할 대상 swiper 이름
-			this.swiperTwin = args.swiperTwin || null;								// 동기화 적용 되는 swiper 이름 (thumbs를 따라 움직임)
+			this.targetName = args.targetName;															// swiper container
+			this.swiperBox = $(".swiper_box", this.targetName);											// swiper box
+			this.swiperSlide = args.swiperSlide ? $(args.swiperSlide) : $(this.swiperBox).children();	// swiper slide child
+			this.loop = args.loop || false;																// 무한, 유한 설정
+			this.page = args.page || false;																// 페이징 설정
+			this.bundle = args.bundle || 1;																// 움직일 슬라이드 그룹 수
+			this.navi = args.navi;																		// 네비(좌,우) 버튼 설정
+			this.indicator = args.indicator || false;													// 인디케이터 설정
+			this.autoPlay = args.autoPlay;																// 자동롤링 설정
+			this.autoHeight = args.autoHeight || false;													// 자동높이 설정
+			this.controlGroup = args.controlGroup || false;												// 유틸(페이징,인디케이터) 그룹 설정
+			this.speed = args.speed || 1000;															// swiper 이동 속도
+			this.spaceBetween = args.spaceBetween || 0;													// item 간격 설정
+			this.alignCenter = args.alignCenter || false;												// item 센터 기준으로 정렬
+			this.vertical = args.vertical || false;														// swiper 방향 설정 horizontal or vertical
+			this.simulateTouch = (args.simulateTouch != false ? true : false);							// 터치 기능 설정
+			this.thumbs = args.thumbs || null;															// 동기화 할 대상 swiper 이름
+			this.swiperTwin = args.swiperTwin || null;													// 동기화 적용 되는 swiper 이름 (thumbs를 따라 움직임)
+			this.freeMode = args.freeMode || false;														// 너비가 제각각인 경우 사용
 
 			// 사용자 추가 이벤트 설정
 			this.initAfter = this.slideChangeStart = this.slideChangeEnd = function() {};
@@ -308,13 +316,17 @@ https://unpkg.com/browse/swiper@6.4.5/
 			this.maxPage;												// page 최대수
 			this.maxMove = 0;											// 최대 이동 가능 거리
 
-			this.sizeBundle;											// 묶음 너비
+			this.sizeBundle = 0;										// 묶음 너비
 			this.sizeMaxMoment;											// 대상의 최대 직전의 값.(순간적으로 위치를 변경을 하기 위한 기준점)
 			this.sizeFullArea = 0;										// 대상을 감싸는 너비 값.
 			this.sizeFullArea_X2 = 0;									// 내 영역의 2배 크기 :: $(targetName).parent().width() * 2; <- 100% 일 경우 기본값
 			this.sizeItem = 0;											// 대상의 이동 너비 값 (아이템 1개의 너비).
 			this.sizeCached = $(window).width();						// 기기 너비
 			this.sizeAlign = 0;											// item 센터 정렬에 필요한 값.
+
+			this.freeItemFull = 0;										// freeMode 아이템 전체 너비
+			this.freeSizeMax = 0;
+			this.freeSizeBundle = 0;
 
 			this.startX = 0;											// 시작점X.
 			this.startY = 0;											// 시작점Y.
@@ -416,7 +428,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 					this.thumbs.swiperTwin = this;
 				}
 
-				if( this.autoplay ){
+				if( this.autoPlay ){
 					this.fnAutoPlay();
 				}
 
@@ -447,7 +459,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 					var dom = new MutationObserver(DOMcallback);
 					function DOMcallback(e){
-						console.log(e, e[0].target, e[0].type, $(e[0].target).is(":hidden"), obj._observe);
+						//console.log(e, e[0].target, e[0].type, $(e[0].target).is(":hidden"), obj._observe);
 						if(!$(obj.targetName).is(":hidden") && e[0].type == "attributes" && !obj._observe){
 							//console.log("observe");
 							obj.fnInitSetting();
@@ -501,10 +513,26 @@ https://unpkg.com/browse/swiper@6.4.5/
 					this.sizeItem = $(this.swiperSlide)[0].getBoundingClientRect().width + this.spaceBetween;
 				}
 
-				this.preview = Math.round(this.sizeFullArea / this.sizeItem);
-				this.sameItem = (this.bundle == this.preview) ? true : false;
-				this.realItem = $(">li", this.swiperBox).length;
-				this.sizeBundle = this.sizeItem * this.bundle;
+				//this.realItem = $(">li", this.swiperBox).length;
+				this.realItem = $(this.swiperSlide).length;
+
+				if(this.freeMode){
+					var for_loop = true;
+					this.freeItemFull = 0;
+					for(var i = 0;i < this.realItem;i++){
+						this.freeItemFull += $(this.swiperSlide)[i].getBoundingClientRect().width + this.spaceBetween;
+						if(this.sizeFullArea - this.freeItemFull < 0 && for_loop){
+							this.preview = i + 1;
+							for_loop = false;
+						}
+					}
+					this.sameItem = false;
+					this.sizeBundle = $(this.swiperSlide)[this.bundle - 1].offsetLeft + $(this.swiperSlide)[this.bundle - 1].getBoundingClientRect().width + this.spaceBetween;
+				}else{
+					this.preview = Math.round(this.sizeFullArea / this.sizeItem);
+					this.sameItem = (this.bundle == this.preview) ? true : false;
+					this.sizeBundle = this.sizeItem * this.bundle;
+				}
 
 				if(this.alignCenter){
 					this.sizeAlign = (this.sizeFullArea - this.sizeBundle) / 2;
@@ -515,8 +543,13 @@ https://unpkg.com/browse/swiper@6.4.5/
 			// 최대 이동 및 초기 위치 설정
 			fnSettings : function() {
 				this.maxItem = $(">li", this.swiperBox).length;
-				this.standardXY = this.sizeItem * this.addItem;
 				this.etcItem = (this.maxItem - (this.addItem * 2)) % this.bundle;
+
+				if(this.freeMode){
+					this.standardXY = $(this.swiperSlide)[0].offsetLeft;
+				}else{
+					this.standardXY = this.sizeItem * this.addItem;
+				}
 
 				if( this.loop ){
 					this.maxPage = Math.ceil((this.maxItem - (this.addItem * 2)) / this.bundle);
@@ -529,16 +562,44 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 
 					// 최대 이동값 계산.
-					this.maxMove = -this.sizeItem * this.realItem -this.standardXY;
+					if(this.freeMode){
+						this.maxMove = -this.standardXY * 2;
+					}else{
+						this.maxMove = -this.sizeItem * this.realItem - this.standardXY;
+					}
 				}else{
-					if(this.bundle == 1){
+					if(this.freeMode){
 						if(this.alignCenter){
-							this.maxPage = this.maxItem / this.bundle;
+							if(this.bundle == 1){
+								this.maxPage = this.maxItem / this.bundle;
+							}else{
+								this.maxPage = Math.ceil(this.maxItem / this.bundle);
+							}
 						}else{
-							this.maxPage = this.maxItem / this.bundle - (this.preview - this.bundle);
+							var _tmp = 0;
+							var y = this.bundle;
+							for(var i = 0;i < this.realItem / this.bundle;i++){
+								for(var x = i*this.bundle;x < y;x++){
+									_tmp += $(this.swiperSlide)[x].getBoundingClientRect().width + this.spaceBetween;
+								}
+								y += this.bundle;
+								
+								this.maxPage = Math.ceil(y / this.bundle);
+								if(this.freeItemFull - this.sizeFullArea - _tmp < 0){
+									break;
+								}
+							}
 						}
 					}else{
-						this.maxPage = Math.round(this.maxItem / this.bundle);
+						if(this.bundle == 1){
+							if(this.alignCenter){
+								this.maxPage = this.maxItem / this.bundle;
+							}else{
+								this.maxPage = this.maxItem / this.bundle - (this.preview - this.bundle);
+							}
+						}else{
+							this.maxPage = Math.ceil(this.maxItem / this.bundle);
+						}
 					}
 
 					if(this.vertical){
@@ -551,10 +612,19 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 
 					// 최대 이동값 계산.
-					if(this.alignCenter){
-						this.maxMove = this.maxItem * -this.sizeItem + this.sizeAlign + this.sizeBundle;
+					if(this.freeMode){
+						if(this.alignCenter){
+							this.maxMove = (this.sizeFullArea - ($(this.swiperSlide)[this.realItem - 1].offsetLeft + $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width + this.spaceBetween)) - (this.sizeFullArea - $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width - this.spaceBetween) / 2;
+						}else{
+							this.maxMove = this.sizeFullArea - ($(this.swiperSlide)[this.realItem - 1].offsetLeft + $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width + this.spaceBetween);
+						}
 					}else{
-						this.maxMove = (this.maxItem - this.preview) * -this.sizeItem;
+						// 최대 이동값 계산.
+						if(this.alignCenter){
+							this.maxMove = this.maxItem * -this.sizeItem + this.sizeAlign + this.sizeBundle;
+						}else{
+							this.maxMove = (this.maxItem - this.preview) * -this.sizeItem;
+						}
 					}
 				}
 
@@ -564,14 +634,33 @@ https://unpkg.com/browse/swiper@6.4.5/
 					$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 				}
 
-				if( this.etcItem == 0 ){
-					this.sizeMaxMoment = this.maxMove + this.sizeBundle + this.sizeAlign;
+				// loop 경우, 최대 직전 위치값 설정
+				if(this.freeMode){
+					var _sizeMaxMoment = 0;
+					if( this.etcItem == 0 ){
+						for(var i = this.bundle;i > 0;i--){
+							_sizeMaxMoment += $(this.swiperSlide)[this.realItem - i].getBoundingClientRect().width + this.spaceBetween;
+						}
+					}else{
+						for(var i = this.etcItem;i > 0;i--){
+							_sizeMaxMoment += $(this.swiperSlide)[this.realItem - i].getBoundingClientRect().width + this.spaceBetween;
+						}
+					}
+					if(this.alignCenter){
+						this.sizeMaxMoment = this.maxMove + _sizeMaxMoment + ((this.sizeFullArea - _sizeMaxMoment) / 2);
+					}else{
+						this.sizeMaxMoment = this.maxMove + _sizeMaxMoment;
+					}
 				}else{
-					this.sizeMaxMoment = this.maxMove + this.sizeItem * this.etcItem + this.sizeAlign;
+					if( this.etcItem == 0 ){
+						this.sizeMaxMoment = this.maxMove + this.sizeBundle + this.sizeAlign;
+					}else{
+						this.sizeMaxMoment = this.maxMove + this.sizeItem * this.etcItem + this.sizeAlign;
+					}
 				}
 
 				//console.log("data-swiper=" + $(this.targetName).attr("data-swiper") + " ::", "max =", this.maxItem, "/ sizeBundle=", this.sizeBundle, " / sizeMaxMoment", this.sizeMaxMoment);
- 				$(this.swiperSlide).eq((this.moveLv * this.bundle)).addClass("on");
+ 				$(this.swiperSlide).eq(this.moveLv * this.bundle).addClass("on");
 
 				// 자동 높이 설정
 				this.fnAutoHeight();
@@ -656,7 +745,8 @@ https://unpkg.com/browse/swiper@6.4.5/
 				function fnEventIndicator() {
 					$("> li:first", target_indi).addClass("on");
 
-					$(target_indi).off("click.indicator").on("click.indicator", "a", function(e) {
+					// click.indicator 이벤트에서 this.evtTypeStart 변경
+					$(target_indi).off("click.indicator").on(obj.evtTypeStart, "a", function(e) {
 						//자동 롤링 제거
 						clearTimeout(obj.autoSetTime);
 
@@ -701,12 +791,13 @@ https://unpkg.com/browse/swiper@6.4.5/
 							obj.fnPageCount();
 						}
 
-						if( obj.autoplay ){
+						if( obj.autoPlay ){
 							obj.fnAutoPlay();
 						}
 						*/
 
 						e.preventDefault();
+						e.stopPropagation();
 					});
 				}
 			},
@@ -745,22 +836,46 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 			// 좌측 이동 
 			fnPrevMove : function(obj, e) {
+				if(obj.alignCenter && obj.freeMode){
+					console.log(obj.moveLv);
+					var _tmp = 0, _lv;
+					for(var i = 0;i < obj.bundle;i++){
+						//_tmp += $(obj.swiperSlide)[Math.abs(obj.bundle * obj.moveLv + i) % obj.realItem].getBoundingClientRect().width + obj.spaceBetween;
+						console.log("for :" + (obj.bundle * obj.moveLv + i < 0 ? obj.realItem + (obj.bundle * obj.moveLv + i) : obj.bundle * obj.moveLv + i));
+						_lv = obj.bundle * obj.moveLv + i < 0 ? obj.realItem + (obj.bundle * obj.moveLv + i) : obj.bundle * obj.moveLv + i;
+						if(_lv >= obj.realItem){
+							break;
+						}
+						_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
+					}
+					obj.sizeAlign = (obj.sizeFullArea - _tmp) / 2;
+				}
+
 				obj.moveLv--;
 				if( obj.loop ){
 					// 최소 위치를 넘으면 순간적으로 이동시킴.
 					if( obj.moveLv < 0 ){
 						obj.moveLv = obj.maxPage - 1;
+
 						if(obj.vertical){
-							if( obj.etcItem == 0 ){
-								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+							if(obj.freeMode){
+								var _str = '0px, ' + (-obj.standardXY * 2 + obj.sizeAlign) + 'px, 0px';
 							}else{
-								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+								if( obj.etcItem == 0 ){
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px';
+								}else{
+									var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
+								}
 							}
 						}else{
-							if( obj.etcItem == 0 ){
-								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+							if(obj.freeMode){
+								var _str = (-obj.standardXY * 2 + obj.sizeAlign) + 'px, 0px, 0px';
 							}else{
-								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								if( obj.etcItem == 0 ){
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+								}else{
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) - (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								}
 							}
 						}
 
@@ -777,6 +892,20 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 			// 우측 이동
 			fnNextMove : function(obj, e) {
+				if(obj.alignCenter && obj.freeMode){
+					var _tmp = 0, _lv;
+					for(var i = 0;i < obj.bundle;i++){
+						//_tmp += $(obj.swiperSlide)[Math.abs(obj.bundle * obj.moveLv + i) % obj.realItem].getBoundingClientRect().width + obj.spaceBetween;
+						_lv = obj.bundle * obj.moveLv + i >= obj.realItem ? (obj.bundle * obj.moveLv + i) - obj.realItem : obj.bundle * obj.moveLv + i;
+						if(_lv < 0){
+							break;
+						}
+						_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
+					}
+					obj.sizeBundle = _tmp;
+					obj.sizeAlign = (obj.sizeFullArea - _tmp) / 2;
+				}
+
 				obj.moveLv++;
 				if( obj.loop ){
 					// 최대 위치를 넘으면 순간적으로 이동시킴.
@@ -789,10 +918,25 @@ https://unpkg.com/browse/swiper@6.4.5/
 								var _str = '0px, ' + (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px';
 							}
 						}else{
-							if( obj.etcItem == 0 ){
-								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+							if(obj.freeMode){
+								var _tmp = 0;
+								if( obj.etcItem == 0 ){
+									for(var i = 0;i < obj.bundle;i++){
+										_tmp += $(obj.swiperSlide)[obj.realItem - i - 1].getBoundingClientRect().width + obj.spaceBetween;
+									}
+									var _str = (-obj.standardXY + _tmp + obj.sizeAlign) + 'px, 0px, 0px';
+								}else{
+									for(var i = 0;i < obj.etcItem;i++){
+										_tmp += $(obj.swiperSlide)[obj.realItem - i - 1].getBoundingClientRect().width + obj.spaceBetween;
+									}
+									var _str = (-obj.standardXY + _tmp + obj.sizeAlign) + 'px, 0px, 0px';
+								}
 							}else{
-								var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								if( obj.etcItem == 0 ){
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
+								}else{
+									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + (obj.sizeBundle - (obj.bundle - obj.etcItem) * obj.sizeItem) + obj.sizeAlign) + 'px, 0px, 0px';
+								}
 							}
 						}
 
@@ -820,7 +964,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 				if(obj.simulateTouch){
 					obj.scrolling = false;
-					obj.transxReset = true;
+					obj.transxReset = false;
 					obj.targetEvent = true;
 					obj.dragXY = 0;
 
@@ -956,29 +1100,98 @@ https://unpkg.com/browse/swiper@6.4.5/
 						obj.mouseEnd = obj.fnTransform3D( obj.swiperBox );
 
 						if( obj.loop ){
-							// 최소, 최대 위치를 넘으면 순간적으로 이동시킴.
-							if( obj.resultXY < -obj.sizeBundle * 0.3 && obj.swipeRight || obj.resultXY > obj.sizeBundle * 0.3 && !obj.swipeRight ){
-								if( obj.transxReset ){
-									if( Number(obj.mouseEnd) >= -obj.standardXY + obj.sizeAlign){
-										if(obj.vertical){
-											var tmp_val = '0px, ' + (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px';
-										}else{
-											var tmp_val = (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px, 0px';
+							if(obj.freeMode){
+								var _resultXY = obj.resultXY;
+								var _realMoveLv = _moveLv = obj.moveLv;
+								if(obj.swipeRight){
+									while(true){
+										//console.log(_moveLv);
+										var _tmp = 0, _lv;
+										for(var i = 0;i < obj.bundle;i++){
+											//console.log("for :" + (obj.bundle * _moveLv + i >= obj.realItem ? (obj.bundle * _moveLv + i) - obj.realItem : obj.bundle * _moveLv + i));
+											_lv = obj.bundle * _moveLv + i >= obj.realItem ? (obj.bundle * _moveLv + i) - obj.realItem : obj.bundle * _moveLv + i;
+											if(_lv < 0){
+												break;
+											}
+											_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
 										}
-										//console.log(tmp_val, "/", Number(obj.mouseEnd));
-									}else if( Number(obj.mouseEnd) <= obj.sizeMaxMoment){
-										if(obj.vertical){
-											var tmp_val = '0px, ' + -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px';
-										}else{
-											var tmp_val = -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px, 0px';
-										}
-										//console.log("a", tmp_val, "/", obj.sizeFullArea, obj.maxMove, Number(obj.mouseEnd));
-									}
-									$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + ")"});
+										//console.log(_tmp, "30% :" + _tmp * -0.3, _resultXY, "Lv" + _moveLv);
 
-									obj.mouseEnd = obj.fnTransform3D( obj.swiperBox );
-									obj.transxReset = false;
+										obj.sizeBundle = _tmp;
+										if(obj.alignCenter){
+											obj.sizeAlign = (obj.sizeFullArea - _tmp) / 2;
+										}
+										if(_tmp * -0.3 > _resultXY){
+											_resultXY = _tmp + _resultXY;
+											_moveLv++;
+											_realMoveLv = _moveLv;
+										}else{
+											if(_realMoveLv >= obj.maxPage){
+												obj.transxReset = true;
+											}
+											break;
+										}
+									}
+								}else{
+									_moveLv--;
+									while(true){
+										//console.log(_moveLv);
+										var _tmp = 0, _lv;
+										for(var i = 0;i < obj.bundle;i++){
+											//console.log("for :" + (obj.bundle * _moveLv + i < 0 ? obj.realItem + (obj.bundle * _moveLv + i) : obj.bundle * _moveLv + i));
+											_lv = obj.bundle * _moveLv + i < 0 ? obj.realItem + (obj.bundle * _moveLv + i) : obj.bundle * _moveLv + i;
+											if(_lv >= obj.realItem){
+												break;
+											}
+											_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
+										}
+										//console.log(_tmp, "30% :" + _tmp * 0.3, _resultXY, "Lv" + _moveLv);
+
+										obj.sizeBundle = _tmp;
+										if(obj.alignCenter){
+											obj.sizeAlign = (obj.sizeFullArea - _tmp) / 2;
+										}
+										if(_tmp * 0.3 < _resultXY){
+											_resultXY = _resultXY - _tmp;
+											_realMoveLv = _moveLv;
+											_moveLv--;
+										}else{
+											if(_realMoveLv < 0){
+												obj.transxReset = true;
+											}
+											break;
+										}
+									}
 								}
+								//console.log("최종", "obj.resultXY: " + obj.resultXY, " / obj.sizeBundle: " + obj.sizeBundle, " / 오른쪽 0.3: " + -obj.sizeBundle * 0.3, " / 왼쪽 0.3: " + obj.sizeBundle * 0.3, " / _realMoveLv: " + _realMoveLv);
+							}else{
+								if(obj.resultXY < -obj.sizeBundle * 0.3 && obj.swipeRight || obj.resultXY > obj.sizeBundle * 0.3 && !obj.swipeRight){
+									obj.transxReset = true;
+								}
+							}
+							//console.log("moveLv :", obj.moveLv, Number(obj.mouseEnd), "/ obj.resultXY :", obj.resultXY, obj.sizeMaxMoment, "/ sizeBundle :", obj.sizeBundle, "/ sizeAlign :", obj.sizeAlign, -obj.standardXY + obj.sizeAlign);
+
+							// 최소, 최대 위치를 넘으면 순간적으로 이동시킴.
+							if( obj.transxReset ){
+								if( Number(obj.mouseEnd) >= -obj.standardXY + obj.sizeAlign){	// 좌측
+									if(obj.vertical){
+										var tmp_val = '0px, ' + (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px';
+									}else{
+										var tmp_val = (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px, 0px';
+									}
+									console.log("좌측순간", tmp_val, "/", Number(obj.mouseEnd));
+								}else if( Number(obj.mouseEnd) <= obj.sizeMaxMoment){	// 우측
+									if(obj.vertical){
+										var tmp_val = '0px, ' + -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px';
+									}else{
+										var tmp_val = -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px, 0px';
+									}
+									console.log("우측순간", tmp_val, "/", obj.sizeFullArea, obj.maxMove, Number(obj.mouseEnd));
+								}
+								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + ")"});
+
+								obj.mouseEnd = obj.fnTransform3D( obj.swiperBox );
+								obj.transxReset = false;
 							}
 						}
 						//console.log("move", obj.mouseEnd, obj.sizeItem, obj.moveLv);
@@ -987,17 +1200,69 @@ https://unpkg.com/browse/swiper@6.4.5/
 							$(obj.swiperBox).addClass("animation");
 							if( obj.swipeRight ){
 								// 30% 이상 우측 이동 시 다음으로..
-								obj.moveLv += Math.floor(obj.resultXY / (-obj.sizeBundle));
-								if(obj.resultXY % (-obj.sizeBundle) < -obj.sizeBundle * 0.3){
-									obj.moveLv++;
+								if(obj.freeMode){
+									var _resultXY = obj.resultXY, _moveLv = obj.moveLv;
+									while(true){
+										//console.log(obj.moveLv);
+										var _tmp = 0, _lv;
+										for(var i = 0;i < obj.bundle;i++){
+											//console.log("for :" + (obj.bundle * obj.moveLv + i >= obj.realItem ? (obj.bundle * obj.moveLv + i) - obj.realItem : obj.bundle * obj.moveLv + i));
+											_lv = obj.bundle * obj.moveLv + i >= obj.realItem ? (obj.bundle * obj.moveLv + i) - obj.realItem : obj.bundle * obj.moveLv + i;
+											if(_lv < 0){
+												break;
+											}
+											_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
+										}
+										//console.log(_tmp, "30% :" + _tmp * 0.3, _resultXY, "Lv" + obj.moveLv);
+										if(_tmp * -0.3 > _resultXY){
+											_resultXY = _tmp + _resultXY;
+											obj.moveLv++;
+										}else{
+											break;
+										}
+									}
+									//console.log("obj.moveLv :" + obj.moveLv);
 									obj.fnVideoStop();
+								}else{
+									obj.moveLv += Math.floor(obj.resultXY / (-obj.sizeBundle));
+									if(obj.resultXY % (-obj.sizeBundle) < -obj.sizeBundle * 0.3){
+										obj.moveLv++;
+										obj.fnVideoStop();
+									}
 								}
 							}else if( !obj.swipeRight ){
 								// 30% 이상 좌측 이동 시 이전으로..
-								obj.moveLv -= Math.floor(obj.resultXY / (obj.sizeBundle));
-								if(obj.resultXY % (obj.sizeBundle) > obj.sizeBundle * 0.3){
-									obj.moveLv--;
+								if(obj.freeMode){
+									var _resultXY = obj.resultXY, _moveLv = obj.moveLv;
+									_moveLv--;
+									while(true){
+										//console.log(_moveLv);
+										var _tmp = 0, _lv;
+										for(var i = 0;i < obj.bundle;i++){
+											//console.log("for :" + (obj.bundle * _moveLv + i < 0 ? obj.realItem + (obj.bundle * _moveLv + i) : obj.bundle * _moveLv + i));
+											_lv = obj.bundle * _moveLv + i < 0 ? obj.realItem + (obj.bundle * _moveLv + i) : obj.bundle * _moveLv + i;
+											if(_lv >= obj.realItem){
+												break;
+											}
+											_tmp += $(obj.swiperSlide)[_lv].getBoundingClientRect().width + obj.spaceBetween;
+										}
+										//console.log(_tmp, "30% :" + _tmp * 0.3, _resultXY, "Lv" + _moveLv);
+										if(_tmp * 0.3 < _resultXY){
+											_resultXY = _resultXY - _tmp;
+											obj.moveLv = _moveLv;
+											_moveLv--;
+										}else{
+											break;
+										}
+									}
+									//console.log("obj.moveLv :" + obj.moveLv);
 									obj.fnVideoStop();
+								}else{
+									obj.moveLv -= Math.floor(obj.resultXY / (obj.sizeBundle));
+									if(obj.resultXY % (obj.sizeBundle) > obj.sizeBundle * 0.3){
+										obj.moveLv--;
+										obj.fnVideoStop();
+									}
 								}
 							}
 							//console.log("fnTouchEnd ::", obj.moveLv, obj.maxPage);
@@ -1055,19 +1320,55 @@ https://unpkg.com/browse/swiper@6.4.5/
 				// 안보이면 자동롤링이 안되게끔 함.
 				if( $(this.swiperBox).is(":visible") ){
 					if( this.loop ){
+						if(this.alignCenter && this.freeMode){
+							var _tmp = 0;
+							for(var i = 0;i < this.bundle;i++){
+								_tmp += $(this.swiperSlide)[Math.abs(this.bundle * this.moveLv + i) % this.realItem].getBoundingClientRect().width + this.spaceBetween;
+							}
+							this.sizeAlign = (this.sizeFullArea - _tmp) / 2;
+						}
+						
 						if(this.vertical){
 							var _str = '0px, ' + (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px';
 						}else{
-							var _str = (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px, 0px';
+							if(this.freeMode){
+								var _tmp = 0;
+								for(var i = 0;i < this.bundle * this.moveLv;i++){
+									_tmp += $(this.swiperSlide)[i].getBoundingClientRect().width + this.spaceBetween;
+								}
+								var _str = (-this.standardXY - _tmp + this.sizeAlign) + 'px, 0px, 0px';
+							}else{
+								var _str = (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px, 0px';
+							}
 						}
 						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + _str + ")"});
 					}else{
-						var target_max = -this.sizeBundle * this.moveLv + this.sizeAlign;
-						if(this.vertical){
-							var _str = '0px, ' + (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px';
+						if(this.freeMode){
+							if(this.alignCenter){
+								var _tmp = 0;
+								for(var i = 0;i < obj.bundle;i++){
+									_tmp += $(obj.swiperSlide)[Math.abs(obj.bundle * obj.moveLv + i) % obj.realItem].getBoundingClientRect().width + obj.spaceBetween;
+								}
+								obj.sizeAlign = (obj.sizeFullArea - _tmp) / 2;
+								var target_max = -$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign;
+							}else{
+								var target_max = -$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft;
+							}
+							
+							if(this.vertical){
+								var _str = '0px, ' + (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px';
+							}else{
+								var _str = (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px, 0px';
+							}
 						}else{
-							var _str = (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px, 0px';
+							var target_max = -this.sizeBundle * this.moveLv + this.sizeAlign;
+							if(this.vertical){
+								var _str = '0px, ' + (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px';
+							}else{
+								var _str = (target_max < this.maxMove ? this.maxMove : target_max) + 'px, 0px, 0px';
+							}
 						}
+
 						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + _str + ")"});
 					}
 					$(this.swiperSlide).removeClass("on").eq(this.moveLv * this.bundle).addClass("on");
@@ -1080,7 +1381,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 						$(obj.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
 
 						//자동 롤링 재설정
-						if( obj.autoplay ){
+						if( obj.autoPlay ){
 							obj.fnAutoPlay();
 						}
 
@@ -1093,7 +1394,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				}else{
 					this.swipeAction = false;
 					$(this.swiperBox).removeClass("animation").off("transitionend webkitTransitionEnd");
-					if( this.autoplay ){
+					if( this.autoPlay ){
 						this.fnAutoPlay();
 					}
 				}
@@ -1130,7 +1431,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 						e.preventDefault();
 					}
 				}else{
-					if( obj.autoplay ){
+					if( obj.autoPlay ){
 						obj.fnAutoPlay();
 					}
 				}
@@ -1150,23 +1451,40 @@ https://unpkg.com/browse/swiper@6.4.5/
 						}else{
 							obj.fnAutoPlay();
 						}
-					},this.autoplay.delay);
+					},this.autoPlay.delay);
 				}else{
 					this.autoSetTime = setTimeout(function() {
 						obj.fnAutoPlay();
-					},this.autoplay.delay);
+					},this.autoPlay.delay);
 				}
 			},
 
 			// 자동 높이 설정
 			fnAutoHeight : function() {
-				if(this.autoheight){
+				if(this.autoHeight){
 					for(var i = 0;i < this.bundle;i++){
 						this.previewHeight[i] = $(this.swiperSlide).eq(this.moveLv * this.bundle + i).outerHeight()
 					}
 					this.previewMaxHeight = Math.max.apply(null, this.previewHeight);
 					$(this.swiperBox).css("height", this.previewMaxHeight);
 				}
+			},
+
+			// freeMode sizeAlign
+			fnFreeSizeAlign : function() {
+				// var _tmp = 0, _num;
+				// for(var i = 0;i < this.bundle;i++){
+				// 	if(this.bundle * this.moveLv + i < 0){console.log(1);
+				// 		_num = 0;
+				// 	}else if(this.bundle * this.moveLv + i > this.realItem - 1){console.log(2);
+				// 		_num = this.realItem - 1;
+				// 	}else{console.log(3);
+				// 		_num = this.bundle * this.moveLv + i;
+				// 	}
+				// 	_tmp += $(this.swiperSlide)[_num].getBoundingClientRect().width + this.spaceBetween;
+				// }
+				// this.sizeAlign = (this.sizeFullArea - _tmp) / 2;
+				//console.log("fnFreeSizeAlign", this.moveLv, this.sizeAlign, _tmp);
 			},
 
 			// 비디오 체크
@@ -1286,7 +1604,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 			fnWindowFocus : function(e) {
 				var obj = e.data;
 				if(e.type == "focus"){
-					if( obj.autoplay ){
+					if( obj.autoPlay ){
 						obj.fnAutoPlay();
 					}
 				}else if(e.type == "blur"){
@@ -1301,7 +1619,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				obj.windowActive = document.visibilityState || document.webkitVisibilityState;
 				//console.log(obj.windowActive);
 
-				if(obj.windowActive === "visible" && obj.autoplay){
+				if(obj.windowActive === "visible" && obj.autoPlay){
 					obj.fnAutoPlay();
 				}else if(obj.windowActive === "hidden"){
 					clearTimeout(obj.autoSetTime); 
@@ -1442,10 +1760,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						// 	prev: "[data-swiper=1] .btn_prev",
 						// 	next: "[data-swiper=1] .btn_next",
 						},
-						//autoplay: {										// auto play 설정
+						//autoPlay: {										// auto play 설정
 						//	delay: 2500,
 						//},
-						//autoheight : true,								// 자동 높이 설정
+						//autoHeight : true,								// 자동 높이 설정
 						on: {
 							initAfter: function() {
 								console.log("initAfter");
@@ -1465,7 +1783,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 		<div style="sdisplay:none;">
 			<strong><b>[swiper=2]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
-			<div class="swiper_area t3" data-swiper=2>
+			<div class="swiper_area t4" data-swiper=2>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
 					<li><a href="#none">22222222222</a></li>
@@ -1498,10 +1816,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=2] .btn_prev",
 						next: "[data-swiper=2] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 
@@ -1538,10 +1856,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper='2_1'] .btn_prev",
 						next: "[data-swiper='2_1'] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 					thumbs: swiper2,
 				});
 			</script>
@@ -1582,10 +1900,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 					// 	prev: "[data-swiper=3] .btn_prev",
 					// 	next: "[data-swiper=3] .btn_next",
 					// },
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 					on: {
 						initAfter: function() {
 							console.log("initAfter-", $(this.targetName)[0], this.maxItem, this.realItem);
@@ -1632,9 +1950,9 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=4] .btn_prev",
 						next: "[data-swiper=4] .btn_next",
 					},
-					autoplay: {										// auto play 설정
-						delay: 2500,
-					},
+					// autoPlay: {										// auto play 설정
+					// 	delay: 2500,
+					// },
 				});
 			</script>
 		</div>
@@ -1674,7 +1992,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//speed: 600,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					//spaceBetween: 50,									// 간격 설정
-					//alignCenter: true,								// item 센터 정렬
+					alignCenter: true,								// item 센터 정렬
 					indicator: true,								// 인디케이터 표시
 					page: true,										// 페이징 넘버 표시
 					//vertical: true,									// 수직 설정
@@ -1683,10 +2001,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=5] .btn_prev",
 						next: "[data-swiper=5] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -1723,10 +2041,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=6] .btn_prev",
 						next: "[data-swiper=6] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -1774,10 +2092,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=7] .btn_prev",
 						next: "[data-swiper=7] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -1813,10 +2131,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=8] .btn_prev",
 						next: "[data-swiper=8] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -1856,7 +2174,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=9] .btn_prev",
 						next: "[data-swiper=9] .btn_next",
 					},
-					// autoplay: {										// auto play 설정
+					// autoPlay: {										// auto play 설정
 					// 	delay: 3000,
 					// },
 				});
@@ -1898,7 +2216,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=10] .btn_prev",
 						next: "[data-swiper=10] .btn_next",
 					},
-					// autoplay: {										// auto play 설정
+					// autoPlay: {										// auto play 설정
 					// 	delay: 3000,
 					// },
 				});
@@ -1931,10 +2249,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=11] .btn_prev",
 						next: "[data-swiper=11] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 3000,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -1974,10 +2292,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=12] .btn_prev",
 						next: "[data-swiper=12] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 3000,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -2020,10 +2338,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=13] .btn_prev",
 						next: "[data-swiper=13] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 3000,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -2063,10 +2381,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 						prev: "[data-swiper=14] .btn_prev",
 						next: "[data-swiper=14] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 3000,
 					//},
-					//autoheight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 				});
 			</script>
 		</div>
@@ -2095,7 +2413,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 			<script type="text/javascript">
 				var swiper15 = new swiper({
 					targetName: "[data-swiper=15]",				// 스와이프 대상
-					//swiperSlide: "[data-swiper=3] > ul > li",		// 스와이프 슬라이드 대상 지정
+					//swiperSlide: "[data-swiper=15] > ul > li",		// 스와이프 슬라이드 대상 지정
 					loop: true,										// 무한 설정
 					speed: 600,										// 스와이프 속도
 					bundle: 1,										// 보여질 그룹
@@ -2109,10 +2427,68 @@ https://unpkg.com/browse/swiper@6.4.5/
 						//prev: "[data-swiper=15] .btn_prev",
 						//next: "[data-swiper=15] .btn_next",
 					},
-					//autoplay: {										// auto play 설정
+					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					autoheight : true,								// 자동 높이 설정
+					autoHeight : true,								// 자동 높이 설정
+					// on: {
+					// 	initAfter: function() {
+					// 		console.log("initAfter-", $(this.targetName)[0], this.maxItem, this.realItem);
+					// 	},
+					// 	slideChangeStart: function() {
+					// 		console.log("slideChangeStart-");
+					// 	},
+					// 	slideChangeEnd: function() {
+					// 		console.log("slideChangeEnd-");
+					// 	},
+					// },
+				});
+			</script>
+		</div>
+
+		<hr />
+		<hr />
+
+		<div>
+			<strong><b>[swiper=16]</b> preview:? / (Bundle:1, Item:10, <span>Loop:true</span>, spaceBetween:25, alignCenter:true, autoHeight:true)</strong>
+			<div class="swiper_area f1" data-swiper=16>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+   					<li><a href="#none">22222222222 22222222222</a></li>
+					<li><a href="#none">33333333333 33333333333</a></li>
+					<li><a href="#none">44444444444 44444444444</a></li>
+					<li><a href="#none">55555555555 55555555555 55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+ 					<li><a href="#none">99999999999 99999999999 99999999999 99999999999</a></li>
+					<li><a href="#none">10,10,10,10 10,10,10,10</a></li>
+				</ul>
+				<!-- <button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button> -->
+			</div>
+			<script type="text/javascript">
+				var swiper16 = new swiper({
+					targetName: "[data-swiper=16]",				// 스와이프 대상
+					//swiperSlide: "[data-swiper=16] > ul > li",		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 700,										// 스와이프 속도
+					bundle: 2,										// 보여질 그룹
+					spaceBetween: 25,								// 간격 설정
+					alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					//vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						//prev: "[data-swiper=16] .btn_prev",
+						//next: "[data-swiper=16] .btn_next",
+					},
+					//autoPlay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+					autoHeight : true,								// 자동 높이 설정
+					freeMode : true,								// 너비 제각각 설정
 					// on: {
 					// 	initAfter: function() {
 					// 		console.log("initAfter-", $(this.targetName)[0], this.maxItem, this.realItem);
