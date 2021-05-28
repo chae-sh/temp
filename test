@@ -2536,6 +2536,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -2606,6 +2607,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		.swiper_area.v1 .swiper_box > li {height:100%;}
 
 		.swiper_area.f1 .swiper_box > li {width:auto;}
+		.swiper_area.f2 .swiper_box {height:400px;flex-wrap:wrap;}
 
 		.swiper_area .swiper_box.t1 {height:auto;align-items:flex-start;}
 	</style>
@@ -2790,6 +2792,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 			this.sizeCached = $(window).width();						// 기기 너비
 			this.sizeAlign = 0;											// item 센터 정렬에 필요한 값.
 
+			this.freeArray = [];										// freeMode 좌표값 배열.
 			this.freeItemFull = 0;										// freeMode 아이템 전체 너비
 			this.freeSizeBundle = 0;									// freeMode sizeBundle 계산
 			this.freeLv = 0;											// freeMode Lv 계산
@@ -2989,7 +2992,12 @@ https://unpkg.com/browse/swiper@6.4.5/
 					var for_loop = true;
 					this.freeItemFull = 0;
 					for(var i = 0;i < this.realItem;i++){
-						this.freeItemFull += $(this.swiperSlide)[i].getBoundingClientRect().width + this.spaceBetween;
+						if(this.vertical){
+							this.freeItemFull += $(this.swiperSlide)[i].getBoundingClientRect().height + this.spaceBetween;
+						}else{
+							this.freeItemFull += $(this.swiperSlide)[i].getBoundingClientRect().width + this.spaceBetween;
+						}
+						
 						if(this.sizeFullArea - this.freeItemFull < 0 && for_loop){
 							this.preview = i + 1;
 							for_loop = false;
@@ -3017,7 +3025,15 @@ https://unpkg.com/browse/swiper@6.4.5/
 				this.etcItem = (this.maxItem - (this.addItem * 2)) % this.bundle;
 
 				if(this.freeMode){
-					this.standardXY = $(this.swiperSlide)[0].offsetLeft;
+					for(var i = 0;i < this.realItem;i++){
+						if(this.vertical){
+							this.freeArray[i] = [$(this.swiperSlide)[i].offsetTop, $(this.swiperSlide)[i].getBoundingClientRect().height + this.spaceBetween];
+						}else{
+							this.freeArray[i] = [$(this.swiperSlide)[i].offsetLeft, $(this.swiperSlide)[i].getBoundingClientRect().width + this.spaceBetween];
+						}
+					}
+
+					this.standardXY = this.freeArray[0][0];
 				}else{
 					this.standardXY = this.sizeItem * this.addItem;
 				}
@@ -3027,11 +3043,10 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 					if(this.freeMode){
 						if(this.vertical){
-							var _str = '0px, ' + (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign) + 'px, 0px';
+							var _str = '0px, ' + (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign) + 'px, 0px';
 						}else{
 							var _str = (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign) + 'px, 0px, 0px';
 						}
-						//$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
 
 						// 최대 이동값 계산.
 						this.maxMove = -this.standardXY * 2;
@@ -3059,7 +3074,11 @@ https://unpkg.com/browse/swiper@6.4.5/
 							var y = this.bundle;
 							for(var i = 0;i < this.realItem / this.bundle;i++){
 								for(var x = i*this.bundle;x < y;x++){
-									_tmp += $(this.swiperSlide)[x].getBoundingClientRect().width + this.spaceBetween;
+									if(this.vertical){
+										_tmp += $(this.swiperSlide)[x].getBoundingClientRect().height + this.spaceBetween;
+									}else{
+										_tmp += $(this.swiperSlide)[x].getBoundingClientRect().width + this.spaceBetween;
+									}
 								}
 								y += this.bundle;
 								
@@ -3093,9 +3112,9 @@ https://unpkg.com/browse/swiper@6.4.5/
 					// 최대 이동값 계산.
 					if(this.freeMode){
 						if(this.alignCenter){
-							this.maxMove = (this.sizeFullArea - ($(this.swiperSlide)[this.realItem - 1].offsetLeft + $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width + this.spaceBetween)) - (this.sizeFullArea - $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width - this.spaceBetween) / 2;
+							this.maxMove = (this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1])) - (this.sizeFullArea - this.freeArray[this.realItem - 1][1] - this.spaceBetween) / 2;
 						}else{
-							this.maxMove = this.sizeFullArea - ($(this.swiperSlide)[this.realItem - 1].offsetLeft + $(this.swiperSlide)[this.realItem - 1].getBoundingClientRect().width + this.spaceBetween);
+							this.maxMove = this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1]);
 						}
 					}else{
 						// 최대 이동값 계산.
@@ -3118,11 +3137,11 @@ https://unpkg.com/browse/swiper@6.4.5/
 					var _sizeMaxMoment = 0;
 					if( this.etcItem == 0 ){
 						for(var i = this.bundle;i > 0;i--){
-							_sizeMaxMoment += $(this.swiperSlide)[this.realItem - i].getBoundingClientRect().width + this.spaceBetween;
+							_sizeMaxMoment += this.freeArray[this.realItem - i][1];
 						}
 					}else{
 						for(var i = this.etcItem;i > 0;i--){
-							_sizeMaxMoment += $(this.swiperSlide)[this.realItem - i].getBoundingClientRect().width + this.spaceBetween;
+							_sizeMaxMoment += this.freeArray[this.realItem - i][1];
 						}
 					}
 					if(this.alignCenter){
@@ -3384,15 +3403,14 @@ https://unpkg.com/browse/swiper@6.4.5/
 								var _tmp = 0;
 								if( obj.etcItem == 0 ){
 									for(var i = 0;i < obj.bundle;i++){
-										_tmp += $(obj.swiperSlide)[obj.realItem - i - 1].getBoundingClientRect().width + obj.spaceBetween;
+										_tmp += obj.freeArray[obj.realItem - i - 1][1];
 									}
-									var _str = (-obj.standardXY + _tmp + obj.sizeAlign) + 'px, 0px, 0px';
 								}else{
 									for(var i = 0;i < obj.etcItem;i++){
-										_tmp += $(obj.swiperSlide)[obj.realItem - i - 1].getBoundingClientRect().width + obj.spaceBetween;
+										_tmp += obj.freeArray[obj.realItem - i - 1][1];
 									}
-									var _str = (-obj.standardXY + _tmp + obj.sizeAlign) + 'px, 0px, 0px';
 								}
+								var _str = (-obj.standardXY + _tmp + obj.sizeAlign) + 'px, 0px, 0px';
 							}else{
 								if( obj.etcItem == 0 ){
 									var _str = (-obj.standardXY - (obj.sizeBundle * obj.moveLv) + obj.sizeBundle + obj.sizeAlign) + 'px, 0px, 0px';
@@ -3586,14 +3604,14 @@ https://unpkg.com/browse/swiper@6.4.5/
 									}else{
 										var tmp_val = (obj.maxMove + obj.standardXY + Number(obj.mouseEnd)) + 'px, 0px, 0px';
 									}
-									console.log("좌측순간", tmp_val, "/", Number(obj.mouseEnd));
+									//console.log("좌측순간", tmp_val, "/", Number(obj.mouseEnd));
 								}else if( Number(obj.mouseEnd) <= obj.sizeMaxMoment){	// 우측
 									if(obj.vertical){
 										var tmp_val = '0px, ' + -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px';
 									}else{
 										var tmp_val = -(obj.standardXY + (obj.maxMove - Number(obj.mouseEnd))) + 'px, 0px, 0px';
 									}
-									console.log("우측순간", tmp_val, "/", obj.sizeFullArea, obj.maxMove, Number(obj.mouseEnd));
+									//console.log("우측순간", tmp_val, "/", obj.sizeFullArea, obj.maxMove, Number(obj.mouseEnd));
 								}
 								$(obj.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + tmp_val + ")"});
 
@@ -3691,19 +3709,28 @@ https://unpkg.com/browse/swiper@6.4.5/
 					}
 
 					if( this.loop ){
-						if(this.vertical){
-							var _str = '0px, ' + (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px';
-						}else{
-							if(this.freeMode){
+						if(this.freeMode){
+							if(this.vertical){
+								var _str = '0px, ' + (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign) + 'px, 0px';
+							}else{
 								var _str = (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign) + 'px, 0px, 0px';
+							}
+						}else{
+							if(this.vertical){
+								var _str = '0px, ' + (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px';
 							}else{
 								var _str = (-this.standardXY - (this.sizeBundle * this.moveLv) + this.sizeAlign) + 'px, 0px, 0px';
 							}
 						}
+						
 						$(this.swiperBox).css({"transition-duration" : this.speed + "ms", "transform" : "translate3d(" + _str + ")"});
 					}else{
 						if(this.freeMode){
-							var target_max = -$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign;
+							if(this.vertical){
+								var target_max = -$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign;
+							}else{
+								var target_max = -$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign;
+							}
 						}else{
 							var target_max = -this.sizeBundle * this.moveLv + this.sizeAlign;
 						}
@@ -3824,7 +3851,11 @@ https://unpkg.com/browse/swiper@6.4.5/
 					if(this.freeLv < 0){
 						break;
 					}
-					this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().width + this.spaceBetween;
+					if(this.vertical){
+						this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().height + this.spaceBetween;
+					}else{
+						this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().width + this.spaceBetween;
+					}
 				}
 				this.sizeBundle = this.freeSizeBundle;
 				if(this.alignCenter){
@@ -3846,7 +3877,11 @@ https://unpkg.com/browse/swiper@6.4.5/
 					if(this.freeLv >= this.realItem){
 						break;
 					}
-					this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().width + this.spaceBetween;
+					if(this.vertical){
+						this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().height + this.spaceBetween;
+					}else{
+						this.freeSizeBundle += $(this.swiperSlide)[this.freeLv].getBoundingClientRect().width + this.spaceBetween;
+					}
 				}
 				this.sizeBundle = this.freeSizeBundle;
 				if(this.alignCenter){
@@ -3900,23 +3935,6 @@ https://unpkg.com/browse/swiper@6.4.5/
 						break;
 					}
 				}
-			},
-
-			// freeMode sizeAlign Next
-			fnFreeSizeAlign : function() {
-				// var _tmp = 0, _num;
-				// for(var i = 0;i < this.bundle;i++){
-				// 	if(this.bundle * this.moveLv + i < 0){console.log(1);
-				// 		_num = 0;
-				// 	}else if(this.bundle * this.moveLv + i > this.realItem - 1){console.log(2);
-				// 		_num = this.realItem - 1;
-				// 	}else{console.log(3);
-				// 		_num = this.bundle * this.moveLv + i;
-				// 	}
-				// 	_tmp += $(this.swiperSlide)[_num].getBoundingClientRect().width + this.spaceBetween;
-				// }
-				// this.sizeAlign = (this.sizeFullArea - _tmp) / 2;
-				//console.log("fnFreeSizeAlign", this.moveLv, this.sizeAlign, _tmp);
 			},
 
 			// 비디오 체크
@@ -4164,7 +4182,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 	<div class="wrap">
 		<div style="display:none;">
 			<div style="display:none;">
-				<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>Loop:false, simulateTouch:false</span>, spaceBetween:50)</strong>
+				<strong><b>[swiper=1]</b> preview:1 / (Bundle:1, Item:4, <span>simulateTouch:false</span>, spaceBetween:50)</strong>
 				<div class="swiper_area" data-swiper=1 style="display:none;">
 					<ul class="swiper_box">
 						<li><a href="#none">111111111111</a></li>
@@ -4214,7 +4232,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div style="sdisplay:none;">
-			<strong><b>[swiper=2]</b> preview:4 / (Bundle:1, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
+			<strong><b>[swiper=2]</b> preview:4 / (Bundle:1, Item:10, spaceBetween:25, alignCenter:true)</strong>
 			<div class="swiper_area t4" data-swiper=2>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
@@ -4298,7 +4316,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div>
-			<strong><b>[swiper=3]</b> preview:4 / (Bundle:2, Item:10, <span>Loop:false</span>, spaceBetween:25, alignCenter:true)</strong>
+			<strong><b>[swiper=3]</b> preview:4 / (Bundle:2, Item:10, spaceBetween:25, alignCenter:true)</strong>
 			<div class="swiper_area t3" data-swiper=3>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
@@ -4352,7 +4370,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div>
-			<strong><b>[swiper=4]</b> preview:2 / (Bundle:2, Item:6, <span>Loop:false</span>, AutoPlay:true)</strong>
+			<strong><b>[swiper=4]</b> preview:2 / (Bundle:2, Item:6, AutoPlay:true)</strong>
 			<div class="swiper_area t1" data-swiper=4>
 				<ul class="swiper_box">
 					<li><a href="#none">1111111111111</a></li>
@@ -4882,7 +4900,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		<hr />
 
 		<div>
-			<strong><b>[swiper=16]</b> preview:? / (Bundle:1, Item:10, <span>Loop:true</span>, spaceBetween:25, alignCenter:true, autoHeight:true)</strong>
+			<strong><b>[swiper=16]</b> preview:? / (Bundle:3, Item:10, spaceBetween:25, <span>freeMode:true</span>)</strong>
 			<div class="swiper_area f1" data-swiper=16>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
@@ -4903,7 +4921,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				var swiper16 = new swiper({
 					targetName: "[data-swiper=16]",				// 스와이프 대상
 					//swiperSlide: "[data-swiper=16] > ul > li",		// 스와이프 슬라이드 대상 지정
-					loop: true,										// 무한 설정
+					//loop: true,										// 무한 설정
 					speed: 700,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
@@ -4919,7 +4937,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					autoHeight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 					freeMode : true,								// 너비 제각각 설정
 					// on: {
 					// 	initAfter: function() {
@@ -4937,18 +4955,18 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div>
-			<strong><b>[swiper=17]</b> preview:? / (Bundle:1, Item:10, <span>Loop:true</span>, spaceBetween:25, alignCenter:true, autoHeight:true)</strong>
+			<strong><b>[swiper=17]</b> preview:? / (Bundle:3, Item:10, spaceBetween:25, alignCenter:true, <span>freeMode:true,</span> autoHeight:true)</strong>
 			<div class="swiper_area f1" data-swiper=17>
-				<ul class="swiper_box">
+				<ul class="swiper_box t1">
 					<li><a href="#none">11111111111</a></li>
-   					<li><a href="#none">22222222222 22222222222</a></li>
-					<li><a href="#none">33333333333 33333333333</a></li>
-					<li><a href="#none">44444444444 44444444444</a></li>
-					<li><a href="#none">55555555555 55555555555 55555555555</a></li>
+   					<li><a href="#none">22222222222<br />22222222222</a></li>
+					<li><a href="#none">33333333333<br />33333333333</a></li>
+					<li><a href="#none">44444444444<br />44444444444</a></li>
+					<li><a href="#none">55555555555<br />55555555555<br />55555555555</a></li>
 					<li><a href="#none">66666666666</a></li>
 					<li><a href="#none">77777777777</a></li>
 					<li><a href="#none">88888888888</a></li>
- 					<li><a href="#none">99999999999 99999999999 99999999999 99999999999</a></li>
+ 					<li><a href="#none">99999999999<br />99999999999<br />99999999999<br />99999999999</a></li>
 					<li><a href="#none">10,10,10,10 10,10,10,10</a></li>
 				</ul>
 				<!-- <button type="button" class="btn_prev">이전</button>
@@ -4958,7 +4976,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				var swiper17 = new swiper({
 					targetName: "[data-swiper=17]",				// 스와이프 대상
 					//swiperSlide: "[data-swiper=17] > ul > li",		// 스와이프 슬라이드 대상 지정
-					loop: true,										// 무한 설정
+					//loop: true,										// 무한 설정
 					speed: 700,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
@@ -4992,7 +5010,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div>
-			<strong><b>[swiper=18]</b> preview:? / (Bundle:1, Item:10, <span>Loop:true</span>, spaceBetween:25, alignCenter:true, autoHeight:true)</strong>
+			<strong><b>[swiper=18]</b> preview:? / (Bundle:3, Item:10, <span>Loop:true, freeMode:true,</span> spaceBetween:25)</strong>
 			<div class="swiper_area f1" data-swiper=18>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
@@ -5013,7 +5031,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				var swiper18 = new swiper({
 					targetName: "[data-swiper=18]",				// 스와이프 대상
 					//swiperSlide: "[data-swiper=18] > ul > li",		// 스와이프 슬라이드 대상 지정
-					//loop: true,										// 무한 설정
+					loop: true,										// 무한 설정
 					speed: 700,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
@@ -5029,7 +5047,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					autoHeight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
 					freeMode : true,								// 너비 제각각 설정
 					// on: {
 					// 	initAfter: function() {
@@ -5047,7 +5065,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 		</div>
 
 		<div>
-			<strong><b>[swiper=19]</b> preview:? / (Bundle:1, Item:10, <span>Loop:true</span>, spaceBetween:25, alignCenter:true, autoHeight:true)</strong>
+			<strong><b>[swiper=19]</b> preview:? / (Bundle:3, Item:10, <span>Loop:true, freeMode:true,</span> spaceBetween:25, alignCenter:true)</strong>
 			<div class="swiper_area f1" data-swiper=19>
 				<ul class="swiper_box">
 					<li><a href="#none">11111111111</a></li>
@@ -5068,7 +5086,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 				var swiper19 = new swiper({
 					targetName: "[data-swiper=19]",				// 스와이프 대상
 					//swiperSlide: "[data-swiper=19] > ul > li",		// 스와이프 슬라이드 대상 지정
-					//loop: true,										// 무한 설정
+					loop: true,										// 무한 설정
 					speed: 700,										// 스와이프 속도
 					bundle: 3,										// 보여질 그룹
 					spaceBetween: 25,								// 간격 설정
@@ -5084,7 +5102,62 @@ https://unpkg.com/browse/swiper@6.4.5/
 					//autoPlay: {										// auto play 설정
 					//	delay: 2500,
 					//},
-					autoHeight : true,								// 자동 높이 설정
+					//autoHeight : true,								// 자동 높이 설정
+					freeMode : true,								// 너비 제각각 설정
+					// on: {
+					// 	initAfter: function() {
+					// 		console.log("initAfter-", $(this.targetName)[0], this.maxItem, this.realItem);
+					// 	},
+					// 	slideChangeStart: function() {
+					// 		console.log("slideChangeStart-");
+					// 	},
+					// 	slideChangeEnd: function() {
+					// 		console.log("slideChangeEnd-");
+					// 	},
+					// },
+				});
+			</script>
+		</div>
+
+		<div>
+			<strong><b>[swiper=20]</b> preview:? / (Bundle:3, Item:10, <span>Loop:true, freeMode:true, vertical:true,</span> spaceBetween:25, alignCenter:true)</strong>
+			<div class="swiper_area f2" data-swiper=20>
+				<ul class="swiper_box">
+					<li><a href="#none">11111111111</a></li>
+   					<li><a href="#none">22222222222<br />22222222222</a></li>
+					<li><a href="#none">33333333333<br />33333333333</a></li>
+					<li><a href="#none">44444444444<br />44444444444</a></li>
+					<li><a href="#none">55555555555<br />55555555555<br />55555555555</a></li>
+					<li><a href="#none">66666666666</a></li>
+					<li><a href="#none">77777777777</a></li>
+					<li><a href="#none">88888888888</a></li>
+ 					<li><a href="#none">99999999999<br />99999999999<br />99999999999<br />99999999999</a></li>
+					<li><a href="#none">10,10,10,10 10,10,10,10</a></li>
+				</ul>
+				<!-- <button type="button" class="btn_prev">이전</button>
+				<button type="button" class="btn_next">다음</button> -->
+			</div>
+			<script type="text/javascript">
+				var swiper20 = new swiper({
+					targetName: "[data-swiper=20]",				// 스와이프 대상
+					//swiperSlide: "[data-swiper=20] > ul > li",		// 스와이프 슬라이드 대상 지정
+					loop: true,										// 무한 설정
+					speed: 700,										// 스와이프 속도
+					bundle: 1,										// 보여질 그룹
+					spaceBetween: 25,								// 간격 설정
+					//alignCenter: true,								// item 센터 정렬
+					indicator: true,								// 인디케이터 표시
+					page: true,										// 페이징 넘버 표시
+					vertical: true,									// 수직 설정
+					//simulateTouch: false,								// 터치 기능 설정
+					navi: {											// 네비(좌,우) 버튼 설정
+						//prev: "[data-swiper=20] .btn_prev",
+						//next: "[data-swiper=20] .btn_next",
+					},
+					//autoPlay: {										// auto play 설정
+					//	delay: 2500,
+					//},
+					//autoHeight : true,								// 자동 높이 설정
 					freeMode : true,								// 너비 제각각 설정
 					// on: {
 					// 	initAfter: function() {
