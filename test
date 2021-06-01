@@ -70,6 +70,8 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 
 
+
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -175,7 +177,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 		/* #########################################################
 			=== swiper ver.3.0 ===
-			ㄴ2021-06-01 : a, button 태그 link 버그 수정
+			ㄴ2021-06-01 : a, button 태그 link 버그 수정 / reSize 버그 수정
  			ㄴ2021-05-31 : freeMode (너비가 제각각 인 경우 : 좌표 * 각 너비 계산 방식, 기존은 레벨 * 고정너비 계산 방식)
 
 			=== swiper ver.2.5 ===
@@ -1658,7 +1660,8 @@ https://unpkg.com/browse/swiper@6.4.5/
 			},
 
 			// 리사이즈 체크
-			fnResizeChk : function(e) {console.log("re");
+			fnResizeChk : function(e) {
+				//console.log("re");
 				var obj = e.data;
 				if( obj.sizeCached != $(window).width() ){
 					obj.sizeCached = $(window).width();
