@@ -72,6 +72,7 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -363,7 +364,6 @@ https://unpkg.com/browse/swiper@6.4.5/
 			this.prevVideo = "";										// 이전 재생한 video ID
 			this._observe = true;										// 대상이 보이는지, 감춰진 상태인지 체크
 			this.rect = $(this.targetName)[0].getBoundingClientRect();	// 대상의 너비, 위치 등 상세값 반환
-			this.linkGo = false;
 
 			this.init();
 		}
@@ -646,14 +646,36 @@ https://unpkg.com/browse/swiper@6.4.5/
 					}
 
 					if(this.freeMode){
+						// 최대 이동값 계산.
+						if(this.alignCenter){
+							this.maxMove = (this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1])) - (this.sizeFullArea - this.freeArray[this.realItem - 1][1] - this.spaceBetween) / 2;
+						}else{
+							this.maxMove = this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1]);
+						}
+
 						if(this.vertical){
 							this.sizeFullArea_X2 = $(this.targetName).height() * 2;
-							var _str = '0px, ' + (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign) + 'px, 0px';
+							if(-$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign < this.maxMove){
+								var _str = '0px, ' + this.maxMove + 'px, 0px';
+							}else{
+								var _str = '0px, ' + (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetTop + this.sizeAlign) + 'px, 0px';
+							}
 						}else{
 							this.sizeFullArea_X2 = $(this.targetName).width() * 2;
-							var _str = (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign) + 'px, 0px, 0px';
+							if(-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign < this.maxMove){
+								var _str = this.maxMove + 'px, 0px, 0px';
+							}else{
+								var _str = (-$(this.swiperSlide)[this.bundle * this.moveLv].offsetLeft + this.sizeAlign) + 'px, 0px, 0px';
+							}
 						}
 					}else{
+						// 최대 이동값 계산.
+						if(this.alignCenter){
+							this.maxMove = this.maxItem * -this.sizeItem + this.sizeAlign + this.sizeBundle;
+						}else{
+							this.maxMove = (this.maxItem - this.preview) * -this.sizeItem;
+						}
+
 						if(this.vertical){
 							this.sizeFullArea_X2 = $(this.targetName).height() * 2;
 							var _str = '0px, ' + (-this.sizeBundle * this.moveLv + this.sizeAlign) + 'px, 0px';
@@ -664,22 +686,6 @@ https://unpkg.com/browse/swiper@6.4.5/
 					}
 					
 					//$(this.swiperBox).css({"transition-duration" : "0ms", "transform" : "translate3d(" + _str + ")"});
-
-					// 최대 이동값 계산.
-					if(this.freeMode){
-						if(this.alignCenter){
-							this.maxMove = (this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1])) - (this.sizeFullArea - this.freeArray[this.realItem - 1][1] - this.spaceBetween) / 2;
-						}else{
-							this.maxMove = this.sizeFullArea - (this.freeArray[this.realItem - 1][0] + this.freeArray[this.realItem - 1][1]);
-						}
-					}else{
-						// 최대 이동값 계산.
-						if(this.alignCenter){
-							this.maxMove = this.maxItem * -this.sizeItem + this.sizeAlign + this.sizeBundle;
-						}else{
-							this.maxMove = (this.maxItem - this.preview) * -this.sizeItem;
-						}
-					}
 				}
 
 				if(this.swipeAction){
@@ -1272,6 +1278,8 @@ https://unpkg.com/browse/swiper@6.4.5/
 				if(this.moveLvPrev != this.moveLv){
 					// 슬라이드 변경 전 실행
 					this.slideChangeStart();
+				}else{
+					obj.swipeAction = false;
 				}
 
 				// 자동롤링에 의해 호출 되었을때 대상이 보일때와 안보일때 분기 처리.
