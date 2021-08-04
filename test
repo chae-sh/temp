@@ -72,3 +72,662 @@ https://unpkg.com/browse/swiper@6.4.5/
 
 
 
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="Content-Script-Type" content="text/javascript" />
+	<meta http-equiv="Content-Style-Type" content="text/css" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Drag</title>
+	<script src="jquery-1.12.4.min.js"></script>
+	<style>
+		* { box-sizing: border-box; }
+		html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
+		form { margin: 0; padding: 0; }
+		img, a { border: 0; color: #666; }
+		ol, ul, li, dl, dt, dd { margin: 0; padding: 0; list-style: none; }
+		h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
+		h1.hidden, h2.hidden, h3.hidden, h4.hidden, h5.hidden, h6.hidden { color: transparent; font-size: 0; line-height: 0; }
+		input[type="text"], input[type="password"], input[type="number"], input[type="email"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; box-shadow: none; border-radius: 0; margin: 0; border: 1px solid #ccc; padding: 0 10px; color: #333; font-size: 13px; }
+		input[type="text"].disabled, input[type="password"].disabled, input[type="number"].disabled, input[type="email"].disabled { background: #f5f5f5; border-color: #d5d5d5; }
+		textarea::-webkit-input-placeholoder { color: #888; border-color: #d5d5d5; }
+		textarea::-webkit-scrollbar { width: 3px; border-radius: 1.5px; }
+		textarea::-webkit-scrollbar-thumb { background: #ccc; }
+		textarea::-webkit-scrollbar-thumb:window-inacrive { background: #ccc; }
+		select, select option { font-size: 14px; }
+		textarea { width: inherit; margin: 0; border: 1px solid #ccc; resize: none; overflow-y: scroll; -webkit-overflow-scrolling: touch; padding: 10px; color: #333; font-size: 13px; line-height: 20px; border-radius: 0; box-shadow: none; -webkit-appearance: none; appearance: none; }
+		button, select { cursor: pointer; }
+		button { margin: 0; padding: 0; outline: 0; border: 0; }
+		::-webkit-input-placeholder { color: #bfbfbf; }
+		::-moz-placeholder { color: #bfbfbf; }
+		:-moz-placeholder { color: #bfbfbf; }
+		::-ms-input-placeholder { color: #bfbfbf; }
+
+		.wrap {padding:30px 20px;overflow:hidden;}
+		.drag_slider1 {position:relative; width:100%; height:16px; /* margin:0 8px; */ display:block; cursor:pointer; sbackground-color:rgba(0,0,139, 0.8);}
+		.drag_slider1:before {content:"";}
+		.drag_slider1:before, 
+		.drag_slider1 .bar {position:absolute; left:0; top:50%; right:0; height:4px; margin-top:-2px; background-color:#bdc1c5;}
+		/*
+		.drag_slider1:before, 
+		.drag_slider1:after, 
+		.drag_slider1 .bar {content:""; position:absolute; left:0; top:50%; right:0; height:4px; margin-top:-2px; background-color:#bdc1c5;}
+		.drag_slider1:after {left:-8px; right:-8px;}
+		*/
+		.drag_slider1 button {position:absolute; top:50%; width:16px; height:16px; margin:0; border-radius:50%; background-color:#e4810c; z-index:2; cursor:pointer;transform:translate(-50%, -50%);}
+		.drag_slider1 button em {position:absolute; left:50%; bottom:100%; margin-bottom:3px; font-style:normal; white-space:nowrap; transform:translateX(-50%); /* pointer-events:none; */}
+		.drag_slider1 .btn_min {left:0;}
+		.drag_slider1 .btn_max {left:100%;}
+		.drag_slider1 button.t1 {width:30px;height:30px;}
+		.drag_slider1 .area {position:absolute;height:100%;}
+		.drag_slider1 .grid_box {height:100%;}
+		.drag_slider1 .grid_text {position:absolute;top:100%;margin-top:5px;transform:translateX(-50%);z-index:1;}
+		.drag_slider1 .grid_text:before {content:"";position:absolute;left:50%;bottom:100%;width:4px;height:16px;margin:0 0 5px -2px;border-radius:5px;background-color:#5f5f5f;}
+		.drag_slider1 .bar {background-color:#ff910f; cursor:pointer; z-index:1;}
+		/*
+		.drag_slider1 .bar:before, 
+		.drag_slider1 .bar:after {content:""; position:absolute; top:0; width:8px; height:4px; background-color:#ff910f;}
+		.drag_slider1 .bar:before {left:-8px;}
+		.drag_slider1 .bar:after {right:-8px;}
+		*/
+		.drag_slider1 .min_value, 
+		.drag_slider1 .max_value {position:absolute; top:20px; font-size:13px;}
+		.drag_slider1 .min_value {left:-8px;}
+		.drag_slider1 .max_value {right:-8px;}
+		.drag_slider1.disabled {margin-bottom:-15px; opacity:1;}
+		.drag_slider1.disabled:before, .drag_slider1.disabled:after, .drag_slider1.disabled .bar, .drag_slider1.disabled button  {background-color:#adb1b6;}
+		.drag_slider1.disabled .min_value, .drag_slider1.disabled .max_value {display:none;}
+		.drag_slider1 ~ .drag_slider1 {margin-top:100px;}
+	</style>
+	<script>
+		/* #########################################################
+			=== dragSlider ver.2.2 ===
+			ㄴ2021-03-18 : DOM 요소 변화 감지(MutationObserver) 기능 추가 > IE11 부터 지원
+			ㄴ2021-03-16 : event namespace 구분 추가
+			ㄴ2021-03-12 : grid 기능 추가
+
+			=== dragSlider ver.2.1 ===
+			ㄴ2021-03-11 : 세팅 min, max를 넘치는 버튼 위치 값은 min, max로 대체 기능 추가
+			ㄴ2021-03-11 : 버튼 초기 위치 세팅 방식을 배열 순번 > 실제값 기준으로 변경
+			ㄴ2021-03-10 : step 값 for문으로 구하는 방식을 좌표값 기준으로 변경(속도 개선)
+
+			=== dragSlider ver.2.0 ===
+			ㄴ2021-01-15 : valueArray 없이 최소, 최대 값으로 설정 기능, step 으로 간격 조정 기능
+
+			=== dragSlider ver.1.0 ===
+			ㄴ2019-12-17 : 최소, 최대 값 초기 위치 설정 추가
+			ㄴ2019-11-28 : PC,MO 버전 통일
+
+			=== 대기 작업 목록 ===
+			// 재정의 이벤트 중복 되는지 확인
+			// 드래그바 안으로 눈금자 넣고, 버튼 벗어나기 않게 하기
+		#########################################################*/
+		function dragBar( args ) {
+			var obj = this;
+			// 이벤트 구분을 위한 값
+			this.guid = args.targetName.replace(/[\[\]\/?.,;:|\)*~`!^\-_+<>@\#$%&\\\=\(\'\"\ ]/gi,"");
+			//console.log(this.guid);
+
+			// if($._data(document).events){firstElementChild
+			// 	console.log($._data(document).events.mousemove.length);
+			// 	$._data(document).events.mousemove[0].data.targetName[0];
+			// 	$($._data(document).events.mousemove).each(function(idx, value){
+			// 		console.log(idx, value.data.targetName.prevObject[0]);
+			// 		console.log(idx, value.data.targetName);
+			// 	});
+			// 	this.guid = $._data(document).events.mousemove.length;
+			// }
+			//console.log(String(args.targetName[0]));
+
+			// 클릭 & 터치 방식 체크
+			if( document.ontouchstart !== null ){
+				this.evtTypeStart = "mousedown." + this.guid;
+				this.evtTypeMove = "mousemove." + this.guid;
+				this.evtTypeEnd = "mouseup." + this.guid;
+			}else{
+				this.evtTypeStart = "touchstart." + this.guid;
+				this.evtTypeMove = "touchmove." + this.guid;
+				this.evtTypeEnd = "touchend." + this.guid;
+			}
+
+			// 좌표 체크
+			this.fnPageXY = function(e) {
+				var pageX = e.originalEvent.changedTouches ? e.originalEvent.changedTouches[0].pageX : e.pageX;
+				var pageY = e.originalEvent.changedTouches ? e.originalEvent.changedTouches[0].pageY : e.pageY;
+
+				var pageXY = new Array (pageX, pageY);
+				//console.log(pageXY);
+				return pageXY;
+			}
+
+			this.targetName = args.targetName;											// 대상.
+			this.dragArea = $("> .area", this.targetName);								// 실 드래그 영역
+			this.min = args.min;														// 최소값
+			this.max = args.max;														// 최대값
+			this.step = args.step || 1;													// 최소,최대 값 사이의 단계
+			this.onlyMax = args.onlyMax || false;										// max 버튼만 사용 할 경우..
+			this.btnTxtMin = args.btnTxtMin || $(".btn_min em", this.targetName);		// 최소가격 노출
+			this.btnTxtMax = args.btnTxtMax || $(".btn_max em", this.targetName);		// 최대가격 노출
+			this.grid = args.grid || false;												// 그리드 설정
+
+			this.toFixedLength = 0;														// 소수점 자리수 체크
+			if(/^\d*[.]\d*?/.test(this.step)){
+				this.toFixedLength = String(this.step).split(".")[1].length;
+			}
+
+			// valueArray 가장 우선시 되는 값 (min,max,step이 있어도 valueArray 있으면 배열 기준으로 함)
+			if($.type(args.value) == "undefined"){
+				var _tempArray = [];
+				var i = this.min;
+				while(i <= this.max){
+					_tempArray.push(Number(i.toFixed(this.toFixedLength)));
+					i += this.step;
+					if(i >= this.max){
+						_tempArray.push(this.max);
+						break;
+					}
+				};
+				this.valueArray = _tempArray;
+			}else{
+				this.valueArray = args.value;
+			}
+			//console.log(this.valueArray);
+
+			this.stepLv = this.valueArray.length - 1;									// 몇 단계로 되어 있나?
+			this.valueType = $.type(this.valueArray[0]);								// 배열이 문자열인가? 숫자인가?
+			this.offsetMin;																// 최소 버튼의 offset 위치
+			this.offsetMax;																// 최대 버튼의 offset 위치
+			this._observe = true;														// 대상이 보이는지, 감춰진 상태인지 체크
+			this.rect = $(this.targetName)[0].getBoundingClientRect();					// 대상의 너비, 위치 등 상세값 반환
+
+			// value 최소, 최대, 초기위치 세팅
+			if( this.valueType == "string" ){
+				this.valueMin = this.valueArray[0];
+				this.valueMax = this.valueArray.slice(-1)[0];
+
+				this.setBtnMin = this.valueArray.indexOf(args.setBtnMin) < 0 ? this.valueMin : args.setBtnMin;
+				this.setBtnMax = this.valueArray.indexOf(args.setBtnMax) < 0 ? this.valueMax : args.setBtnMax;
+			}else if( this.valueType == "number" ){
+				this.valueMin = Math.min.apply(null, this.valueArray);					// text에 사용 할 최소값.
+				this.valueMax = Math.max.apply(null, this.valueArray);					// text에 사용 할 최대값.
+
+				// 최소값 버튼 초기 위치
+				this.setBtnMin = args.min < (args.max < args.setBtnMin ? args.min : args.setBtnMin) ? args.setBtnMin : args.min || args.min;
+				// 최대값 버튼 초기 위치
+				this.setBtnMax = args.max > (args.min > args.setBtnMax ? args.max : args.setBtnMax) ? args.setBtnMax : args.max || args.max;
+			}
+			
+			// 필요한 경우:slideUp시 호출 할 펑션을 설정
+			this.slideUpFunc = args.slideUpFunc;
+
+			this.percent;
+			this.percentUnit;
+			this.percentOver;
+			this.btnWidth;
+			this.goIdx;
+			this.btnL_idx = 0;
+			this.btnR_idx = this.stepLv;
+
+			this.targetEvt = false;
+			this.targetBtn;
+
+			this.init();
+		}
+
+		dragBar.prototype = {
+			init : function() {
+				var obj = this;
+
+				// 사용 버튼 유무 체크
+				if( this.onlyMax ){
+					$(".btn_min", this.targetName).css({"visibility" : "hidden"});
+				}else{
+					$(this.btnTxtMin).text( this.valueMin );
+				}
+				$(this.btnTxtMax).text( this.valueMax );
+
+				// 최소, 최대값이 버튼이 아닌곳에 출력이면 버튼 안 텍스트 숨기기
+				if(!$(this.btnTxtMin).closest(".btn_min").length){
+					$(".btn_min em", this.targetName).css({"visibility" : "hidden"});
+				}
+				if(!$(this.btnTxtMax).closest(".btn_max").length){
+					$(".btn_max em", this.targetName).css({"visibility" : "hidden"});
+				}
+
+				// 기본설정값 구하기 (최소, 최대, 단위당 %크기)
+				this.getMinMax();
+				//$(this.targetName).on(this.evtTypeStart, this, this.sliderDown);
+
+				// 버튼 위치 세팅
+				this.setBtnMove();
+
+				// 그리드
+				if(this.grid){
+					this.gridMake();
+				}else{
+					$(".min_value", this.targetName).text( this.valueMin );
+					$(".max_value", this.targetName).text( this.valueMax );
+				}
+
+				//$._data($('[data-drag="drag1"]')[0]).events.mousedown[0].handler.guid
+				// if($._data($(this.targetName)[0]).events){
+				// 	if($._data($(this.targetName)[0]).events.mousedown){
+				// 		$($._data($(this.targetName)[0]).events.mousedown).each(function(idx, value){
+				// 			//console.log(idx, $(this)[0].namespace);
+				// 			if($(this)[0].namespace == "drag"){
+				// 				this.guid = $(this)[0].guid;console.log($(this)[0].guid)
+				// 			}
+				// 		});
+				// 	}
+				// }
+
+				$(this.targetName)
+					.off(this.evtTypeStart)
+					.on(this.evtTypeStart, this, function(e){obj.sliderDown(e)});
+
+				$(document)
+					.off(this.evtTypeMove).off(this.evtTypeEnd)
+					.on(this.evtTypeMove, this, function(e){obj.sliderMove(e)})
+					.on(this.evtTypeEnd, this, function(e){obj.sliderUp(e)});
+
+				// 대상이 보이는 상태인지, 감춰진 상태인지 체크
+				if(window.MutationObserver){
+					this.fnObserve();
+				}
+			},
+
+			// 대상이 보이는지, 감춰진 상태인지 체크
+			fnObserve : function() {
+				var obj = this;
+
+				if(this.rect.width == 0 && this.rect.height == 0){
+					this._observe = false;
+
+					var dom = new MutationObserver(DOMcallback);
+					function DOMcallback(e){
+						console.log(e, e[0].target, e[0].type, $(e[0].target).is(":hidden"), obj._observe);
+						if(!$(obj.targetName).is(":hidden") && e[0].type == "attributes" && !obj._observe){
+							//console.log("observe");
+							obj.getMinMax();
+							obj._observe = true;
+						}else if($(obj.targetName).is(":hidden") && e[0].type == "attributes" && obj._observe){
+							obj._observe = false;
+						}
+					}
+
+					dom.observe($(this.targetName)[0], {
+						attributes: true,
+						childList: false,
+						//characterData: true,
+						//subtree: true || null,
+						attributeOldValue: true || null,
+						//characterDataOldValue: true || null,
+					});
+
+					$(this.targetName).parents(':hidden').each(function(){
+						dom.observe($(this)[0], {
+							attributes: true,
+							//childList: true,
+							//characterData: true,
+							//subtree: true || null,
+							attributeOldValue: true || null,
+							//characterDataOldValue: true || null,
+						});
+					});
+				}
+			},
+
+			// 마우스 down
+			sliderDown : function (e) {
+				var obj = e.data;
+
+				if ($(obj.targetName).hasClass("disabled")) {
+					return false;
+				}
+
+				//obj.getMinMax();			// 매번 세팅값을 다시 구하면 display:none에 대응이 수월하지만, 불필요한 작업
+
+				obj.targetEvt = true;
+				obj.getPercent(e);
+				obj.eachStep();
+				//console.log("clickX : ", clickX, "percent : ", obj.percent, "% goIdx : ", obj.goIdx);
+
+				obj.targetBtnSet(e);
+
+				obj.goMove(e);
+
+				return false;
+			},
+
+			// 마우스 move
+			sliderMove : function(e) {
+				var obj = e.data;
+
+				if( obj.targetEvt ){
+					obj.getPercent(e);
+					obj.eachStep();
+					obj.goMove(e);
+				}
+			},
+
+			// 마우스 up
+			sliderUp : function(e) {
+				var obj = e.data;
+
+				if( obj.targetEvt ){
+					obj.targetEvt = false;
+					if (typeof obj.slideUpFunc === 'function') {
+						obj.slideUpFunc( obj );
+					}
+					//console.log(obj.goIdx);
+				}
+			},
+
+			// 전체 바를 기준으로 min, max 위치값 저장.
+			getMinMax : function(e) {
+				// 버튼 크기, 최소 좌표값, 최대 좌표값 설정
+				this.btnWidth = $(".btn_max", this.targetName)[0].getBoundingClientRect().width;
+				// 드래그 영역 설정
+				$(this.dragArea).css({"left" : this.btnWidth/2 + "px", "right" : this.btnWidth/2 + "px"});
+
+				this.offsetMin = $(this.dragArea).offset().left;
+				this.offsetMax = $(this.dragArea).offset().left + $(this.dragArea).outerWidth();
+				//console.log(this.targetName, this.btnWidth, this.offsetMin, this.offsetMax, $(this.dragArea).outerWidth());
+
+				// 1개당 몇%를 가지는지 설정
+				if( this.valueType == "string" ){
+					this.percentUnit = 100 / this.stepLv;
+				}else if( this.valueType == "number" ){
+					this.percentUnit = 100 / (this.max - this.min);
+
+					// 만약 step 으로 나눠 떨어지지 않는다면 얼마나 오버 하는지 체크
+					if(this.percentUnit * this.step * this.stepLv > 100){
+						this.percentOver = (100 - (this.percentUnit * this.step * this.stepLv - this.percentUnit * this.step)) / 2;
+					}
+				}
+			},
+
+			// 버튼 위치 설정
+			setBtnMove : function() {
+				//console.log(this.setBtnMin, this.setBtnMax);
+				if( this.valueType == "string" ){
+					if (this.setBtnMin != this.min){
+						this.targetBtn = $(".btn_min", this.targetName);
+						this.goIdx = this.valueArray.indexOf(this.setBtnMin) / this.step;
+						this.goMove();
+					}
+					if (this.setBtnMax != this.max) {
+						this.targetBtn = $(".btn_max", this.targetName);
+						this.goIdx = this.valueArray.indexOf(this.setBtnMax) / this.step;
+						this.goMove();
+					}
+				}else if( this.valueType == "number" ){
+					if (this.setBtnMin != this.min){
+						this.targetBtn = $(".btn_min", this.targetName);
+						this.goIdx = (this.setBtnMin - this.min) / this.step;
+						this.goMove();
+					}
+					if (this.setBtnMax != this.max) {
+						this.targetBtn = $(".btn_max", this.targetName);
+						this.goIdx = (this.setBtnMax - this.min) / this.step;
+						this.goMove();
+					}
+				}
+			},
+
+			// 그리드 만들기
+			gridMake : function() {
+				var obj = this;
+				$(".area .bar", obj.targetName).after('<div class="grid_box"></div>');
+				if( this.valueType == "string" ){
+					$(this.valueArray).each(function(idx, value){
+						var _x = obj.percentUnit * idx;
+						$(".grid_box", obj.targetName).append('<span class="grid_text" style="left:' + _x + '%">' + value + '</span>');
+					});
+				}else if( this.valueType == "number" ){
+					var _lv, _x, _val, _langth, _str;
+					for(var i = 0; i <= 1; i = i + 0.25){
+						_lv = this.stepLv * i;
+						_x = 100 / this.stepLv * _lv;
+						_val = this.min + _lv * this.step;
+						if(String(_val).indexOf("000") > -1){
+							_val = _val.toFixed(String(_val).indexOf("000") - 2);
+						}
+						$(".grid_box", this.targetName).append('<span class="grid_text" style="left:' + _x + '%">' + (_val > this.max ? this.max : _val) + '</span>');
+					}
+				}
+			},
+
+			// 클릭 한 곳으로 이동할 버튼이 누구인지 정하기
+			targetBtnSet : function(e) {
+				var tmp_startXY = this.fnPageXY(e);
+
+				// 현재 버튼들의 위치를 임시 변수에 저장.
+				var tmp_offsetMin = $(".btn_min", this.targetName).offset().left + ($(".btn_min", this.targetName).outerWidth() / 2);
+				var tmp_offsetMax = $(".btn_max", this.targetName).offset().left + ($(".btn_max", this.targetName).outerWidth() / 2);
+				//console.log("tmp_offsetMin : ", tmp_offsetMin, "tmp_offsetMax : ", tmp_offsetMax);
+
+				// 버튼의 중간이 어디인가?
+				var half = tmp_offsetMin + (tmp_offsetMax - tmp_offsetMin) / 2;
+
+				if( this.onlyMax ){
+					// max 버튼만 사용
+					this.targetBtn = $(".btn_max", this.targetName);
+				}else{
+					// 중간을 기준으로 작으면 min 버튼, 크면 max 버튼을 대상으로 함.
+					this.targetBtn = half > tmp_startXY[0] ? $(".btn_min", this.targetName) : $(".btn_max", this.targetName);
+					//console.log("half : ", half, "this.pageX : ", tmp_startXY[0], "targetBtn : ", this.targetBtn);
+				}
+			},
+
+			// 선택한 영역이 몇 %에 속하는가?
+			getPercent : function(e) {
+				var tmp_startXY = this.fnPageXY(e);
+
+				var clickX = Math.abs(this.offsetMin - tmp_startXY[0] > 0 ? 0 : this.offsetMin - tmp_startXY[0]);
+				this.percent = clickX / $(this.dragArea).width() * 100;
+				//console.log("percent :", this.percent, "tmp_startXY[0] :", tmp_startXY[0], "this.offsetMin:", this.offsetMin, "this.offsetMax :", this.offsetMax);
+				if( this.percent > 100 ) {
+					this.percent = 100;
+				}
+			},
+
+			// 선택한 영역이 어느 단계에 속하는지 체크.
+			eachStep : function() {
+				var idx;
+				if( this.valueType == "string" ){
+					idx = Math.round(this.percent / this.percentUnit);
+				}else if( this.valueType == "number" ){
+					if(100 - this.percentOver < this.percent){
+						idx = this.stepLv;
+					}else{
+						idx = Math.round(this.percent / (this.percentUnit * this.step));
+					}
+				}
+
+				this.goIdx = idx;
+				//console.log("goIdx :", idx, "/ this.percent :", this.percent, "/ percentUnit*step :", (this.percentUnit * this.step));
+			},
+
+			// 실제 min, max 버튼이 이동
+			goMove : function(e) {
+				// 전체를 기준으로 몇 %로 이동해야 하는가?
+				var left_val;
+				if( this.valueType == "string" ){
+					left_val = this.percentUnit * this.goIdx;
+				}else if( this.valueType == "number" ){
+					if(100 - this.percentOver < this.percent){
+						left_val = 100;
+					}else{
+						left_val = this.percentUnit * this.goIdx * this.step;
+					}
+				}
+
+				if( this.onlyMax ){
+					// 최대 버튼만 사용 하므로 무조건 이동해라.
+					$(this.targetBtn).css({"left" : left_val + "%"});
+
+					$(".bar", this.targetName).css({"right" : ( 100 - left_val ) + "%"});
+					this.btnR_idx = this.goIdx;
+					$(this.btnTxtMax).text( $.type(this.valueArray[this.goIdx]) == "undefined" ? this.setBtnMax : this.valueArray[this.goIdx] );
+				}else{
+					// 두 값이 이동할 값과 모두 겹치지 않는다면 이동해라.
+					if( $(this.targetBtn).hasClass("btn_min") && this.goIdx <= this.btnR_idx ){
+						$(this.targetBtn).css({"left" : left_val + "%"});
+
+						$(".bar", this.targetName).css({"left" : left_val + "%"});
+						this.btnL_idx = this.goIdx;
+						$(this.btnTxtMin).text( $.type(this.valueArray[this.goIdx]) == "undefined" ? this.setBtnMin : this.valueArray[this.goIdx] );
+					}else if( $(this.targetBtn).hasClass("btn_max") && this.goIdx >= this.btnL_idx ){
+						$(this.targetBtn).css({"left" : left_val + "%"});
+
+						$(".bar", this.targetName).css({"right" : ( 100 - left_val ) + "%"});
+						this.btnR_idx = this.goIdx;
+						$(this.btnTxtMax).text( $.type(this.valueArray[this.goIdx]) == "undefined" ? this.setBtnMax : this.valueArray[this.goIdx] );
+					}
+				}
+			},
+
+			// value 값 추출
+			getValues : function(){
+				var result = {
+					'L_value' : this.valueArray[this.btnL_idx],
+					'R_value' : this.valueArray[this.btnR_idx]
+				};
+				return result;
+			},
+		}
+	</script>
+</head>
+<body>
+	<div class="wrap">
+		<div class="drag_slider1" data-drag="drag1" style="display:none;">
+			<div class="area">
+				<button type="button" class="btn_min"><em>최소</em></button>
+				<div class="bar"></div>
+				<button type="button" class="btn_max"><em>최대</em></button>
+			</div>
+			<span class="min_value"></span>
+			<span class="max_value"></span>
+		</div>
+		<script>
+			var dragbar1 = new dragBar({
+				targetName: '.drag_slider1:eq(0)',					// 스크립트 적용 대상
+				//onlyMax: true,									// 최대값 버튼만 사용 할 경우
+				//btnTxtMin: '[data-drag="drag1"] .min_value',	// 최소값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_min em" 위치에 출력.
+				//btnTxtMax: '[data-drag="drag1"] .max_value',	// 최대값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_max em" 위치에 출력.
+				min: 50,											// 최소값 설정
+				max: 1500,											// 최대값 설정
+				//step: 50,											// 최소,최대 값 사이의 단계
+				setBtnMin: 100,										// 최소 버튼 초기 위치 설정.
+				setBtnMax: 170,										// 최대 버튼 초기 위치 설정.
+				//grid: true,										// 그리드 설정
+				//value: ["200,000원", "220,000원", "240,000원", "260,000원", "280,000원", "300,000원", "350,000원", "400,000원", "500,000원", "600,000원", "700,000원", "800,000원", "900,000원", "1,000,000원", "2,000,000원", "3,000,000원", "5,000,000원"], //배열로 값을 줄 경우
+			});
+		</script>
+
+		<div class="drag_slider1" data-drag="drag2">
+			<div class="area">
+				<button type="button" class="btn_min t1"><em>최소</em></button>
+				<div class="bar"></div>
+				<button type="button" class="btn_max t1"><em>최대</em></button>
+			</div>
+			<span class="min_value"></span>
+			<span class="max_value"></span>
+		</div>
+		<script>
+			var dragbar2 = new dragBar({
+				targetName: '.wrap [data-drag="drag2"]',				// 스크립트 적용 대상
+				//onlyMax: true, // 최대값 버튼만 사용 할 경우
+				//btnTxtMin: '[data-drag="drag2"] .min_value',	// 최소값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_min em" 위치에 출력.
+				//btnTxtMax: '[data-drag="drag2"] .max_value',	// 최대값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_max em" 위치에 출력.
+				min: -10,											// 최소값 설정
+				max: 27,												// 최대값 설정
+				step: 3,											// 최소,최대 값 사이의 단계
+				//setBtnMin: 50,									// 최소 버튼 초기 위치 설정.
+				//setBtnMax: 120,									// 최대 버튼 초기 위치 설정.
+				grid: true,											// 그리드 설정
+				//value: ["200,000원", "220,000원", "240,000원", "260,000원", "280,000원", "300,000원", "350,000원", "400,000원", "500,000원", "600,000원", "700,000원", "800,000원", "900,000원", "1,000,000원", "2,000,000원", "3,000,000원", "5,000,000원"], //배열로 값을 줄 경우
+			});
+		</script>
+
+		<div class="drag_slider1" data-drag="drag3">
+			<div class="area">
+				<button type="button" class="btn_min"><em>최소</em></button>
+				<div class="bar"></div>
+				<button type="button" class="btn_max"><em>최대</em></button>
+			</div>
+			<span class="min_value"></span>
+			<span class="max_value"></span>
+		</div>
+		<script>
+			var dragbar3 = new dragBar({
+				targetName: '[data-drag="drag3"]',				// 스크립트 적용 대상
+				//onlyMax: true, // 최대값 버튼만 사용 할 경우
+				//btnTxtMin: '[data-drag="drag3"] .min_value',	// 최소값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_min em" 위치에 출력.
+				//btnTxtMax: '[data-drag="drag3"] .max_value',	// 최대값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_max em" 위치에 출력.
+				min: -10,											// 최소값 설정
+				max: 10,											// 최대값 설정
+				step: 0.5,											// 최소,최대 값 사이의 단계
+				setBtnMin: -15,										// 최소 버튼 초기 위치 설정.
+				setBtnMax: 7.2,										// 최대 버튼 초기 위치 설정.
+				grid: true,											// 그리드 설정
+				//value: ["200,000원", "220,000원", "240,000원", "260,000원", "280,000원", "300,000원", "350,000원", "400,000원", "500,000원", "600,000원", "700,000원", "800,000원", "900,000원", "1,000,000원", "2,000,000원", "3,000,000원", "5,000,000원"], //배열로 값을 줄 경우
+			});
+		</script>
+
+		<div class="drag_slider1" data-drag="drag4">
+			<div class="area">
+				<button type="button" class="btn_min"><em>최소</em></button>
+				<div class="bar"></div>
+				<button type="button" class="btn_max"><em>최대</em></button>
+			</div>
+			<span class="min_value"></span>
+			<span class="max_value"></span>
+		</div>
+		<script>
+			var dragbar4 = new dragBar({
+				targetName: '[data-drag="drag4"]',				// 스크립트 적용 대상
+				//onlyMax: true, // 최대값 버튼만 사용 할 경우
+				//btnTxtMin: '[data-drag="drag4"] .min_value',	// 최소값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_min em" 위치에 출력.
+				//btnTxtMax: '[data-drag="drag4"] .max_value',	// 최대값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_max em" 위치에 출력.
+				min: -1,											// 최소값 설정
+				max: 1,											// 최대값 설정
+				step: 0.1,											// 최소,최대 값 사이의 단계
+				setBtnMin: -0.5,										// 최소 버튼 초기 위치 설정.
+				setBtnMax: 0.5,										// 최대 버튼 초기 위치 설정.
+				grid: true,											// 그리드 설정
+				//value: ["200,000원", "220,000원", "240,000원", "260,000원", "280,000원", "300,000원", "350,000원", "400,000원", "500,000원", "600,000원", "700,000원", "800,000원", "900,000원", "1,000,000원", "2,000,000원", "3,000,000원", "5,000,000원"], //배열로 값을 줄 경우
+			});
+		</script>
+
+		<div class="drag_slider1" data-drag="drag5">
+			<div class="area">
+				<button type="button" class="btn_min"><em>최소</em></button>
+				<div class="bar"></div>
+				<button type="button" class="btn_max"><em>최대</em></button>
+			</div>
+			<span class="min_value"></span>
+			<span class="max_value"></span>
+		</div>
+		<script>
+			var dragbar5 = new dragBar({
+				targetName: '[data-drag="drag5"]',			// 스크립트 적용 대상
+				onlyMax: true,									// 최대값 버튼만 사용 할 경우
+				//btnTxtMin: '[data-drag="drag5"] .min_value',	// 최소값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_min em" 위치에 출력.
+				//btnTxtMax: '[data-drag="drag5"] .max_value',	// 최대값 텍스트를 노출 할 위치. 설정하지 않을 시 대상의 ".btn_max em" 위치에 출력.
+				//min: 50,										// 최소값 설정
+				//max: 1500,									// 최대값 설정
+				//step: 50,										// 최소,최대 값 사이의 단계
+				//setBtnMin: "B",								// 최소 버튼 초기 위치 설정.
+				setBtnMax: "M",									// 최대 버튼 초기 위치 설정.
+				grid: true,										// 그리드 설정
+				value: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"], //배열로 값을 줄 경우
+			});
+		</script>
+	</div>
+</body>
+</html>
